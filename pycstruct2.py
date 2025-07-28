@@ -63,43 +63,43 @@ def deformat_source(struct_def:str) -> str:
 #
 #     return '\n'.join(lines)
 
-ctype_fmts:dict[str, str] = {
-    'bool':'u8',
-    'int8_t':'i8',
-    'char':'i8',
-    'signed char': 'i8',
-    'uint8_t':'u8',
-    'unsigned char': 'u8',
-    'int16_t':'i16',
-    'short': 'i16',
-    'short int': 'i16',
-    'signed short': 'i16',
-    'signed short int': 'i16',
-    'uint16_t':'u16',
-    'unsigned short': 'u16',
-    'unsigned short int': 'u16',
-    'int32_t': 'i32',
-    'int': 'i32',
-    'signed': 'i32',
-    'signed int': 'i32',
-    'uint32_t': 'u32',
-    'unsigned int': 'u32',
-    'int64_t': 'i64',
-    'long': 'i64',
-    'long int': 'i64',
-    'signed long': 'i64',
-    'signed long int': 'i64',
-    'long long': 'i64',
-    'long long int': 'i64',
-    'signed long long': 'i64',
-    'signed long long int': 'i64',
-    'uint64_t': 'u64',
-    'unsigned long': 'u64',
-    'unsigned long int': 'u64',
-    'unsigned long long': 'u64',
-    'unsigned long long int': 'u64',
-    'float': 'f32',
-    'double': 'f64',
+ctype_fmts:dict[str, tuple[str,str]] = {
+    'bool':('u8', '%1X'),
+    'int8_t':('i8', '%3d'),
+    'char':('i8', '%3d'),
+    'signed char':('i8', '%3d'),
+    'uint8_t': ('u8', '%02X'),
+    'unsigned char': ('u8', '%02X'),
+    'int16_t':('i16', '%5d'),
+    'short': ('i16', '%5d'),
+    'short int': ('i16', '%5d'),
+    'signed short': ('i16', '%5d'),
+    'signed short int': ('i16', '%5d'),
+    'uint16_t':('u16', '%04X'),
+    'unsigned short': ('u16', '%04X'),
+    'unsigned short int': ('u16', '%04X'),
+    'int32_t': ('i32', '%9d'),
+    'int': ('i32', '%9d'),
+    'signed': ('i32', '%9d'),
+    'signed int': ('i32', '%9d'),
+    'uint32_t': ('u32', '%08X'),
+    'unsigned int': ('u32', '%08X'),
+    'int64_t': ('i64', '%20lld'),
+    'long': ('i64', '%20lld'),
+    'long int': ('i64', '%20lld'),
+    'signed long': ('i64', '%20lld'),
+    'signed long int': ('i64', '%20lld'),
+    'long long': ('i64', '%20lld'),
+    'long long int': ('i64', '%20lld'),
+    'signed long long': ('i64', '%20lld'),
+    'signed long long int': ('i64', '%20lld'),
+    'uint64_t': ('u64', '%016llX'),
+    'unsigned long': ('u64', '%016llX'),
+    'unsigned long int': ('u64', '%016llX'),
+    'unsigned long long': ('u64', '%016llX'),
+    'unsigned long long int': ('u64', '%016llX'),
+    'float': ('f32', '%14.4e'),
+    'double': ('f64','%14.4e') ,
 }
 
 
@@ -264,9 +264,9 @@ class ObjectFrame:
         for v in self.vars:
             if v.ctype in ctype_fmts:
                 if v.size == '0':
-                    macros.append(f'REGISTER_VAR({base_name}, {self.combo_name}{v.name}, {v.ctype}, {ctype_fmts[v.ctype]})')
+                    macros.append(f'REGISTER_VAR({base_name}, {self.combo_name}{v.name}, {v.ctype}, "{ctype_fmts[v.ctype][1]}")')
                 else:
-                    macros.append(f'REGISTER_ARR({base_name}, {self.combo_name}{v.name}, {v.size}, {v.ctype}, {ctype_fmts[v.ctype]})')
+                    macros.append(f'REGISTER_ARR({base_name}, {self.combo_name}{v.name}, {v.size}, {v.ctype}, "{ctype_fmts[v.ctype][1]}")')
 
         
         for b in self.bitfields:
@@ -277,6 +277,26 @@ class ObjectFrame:
 
         return macros
 
+    def if_print_statements(self, base_name:str) -> list[str]:
+        if_checks:list[str] = []
+
+        for frame in self.structs + self.unions:
+            if_checks += frame.if_print_statements(base_name)
+
+        if len(self.combo_name) > 0:
+            self.combo_name += '.'
+
+        for v in self.vars:
+            if_checks += [f'if (structname == "{base_name}" && varname == "{self.combo_name}{v.name}") {{}}']
+
+        for b in self.bitfields:
+            for f, _ in b.fields:
+                if_checks += [f'if (structname == "{base_name}" && varname == "{self.combo_name}{f}") {{}}']
+                
+
+        print(f'\n\n\n{'\n'.join(if_checks)}\n\n\n')
+
+        return if_checks
 
     def _get_frames(self) -> None:
         remainder = self.raw_body
@@ -310,7 +330,7 @@ class ObjectFrame:
             only_members = only_members.replace(s.raw_full, '')
 
         for member in only_members.split(';'):
-            if ':' in member:
+            if ':' in member and not '::' in member:
                 self.bitfields.append(CBitfield(member))
 
     def _get_std_vars(self) -> None:
@@ -400,42 +420,45 @@ def find_bases(filenames:list[str]) -> list[CStruct]:
 def main() -> None:
     source_files:list[str] = glob.glob('./*.h') + glob.glob('./*.cpp')
 
+    source_files.remove('./structs.cpp')
+    source_files.remove('./structs.h')
+
     defined_structs:dict[str, CStruct] = { s.typename:s for s in find_bases(source_files) }
 
     with open('structs.cpp') as f:
         struct_cpp:str = f.read()
+    #
+    # cpp_file_marker = 'pycstruct_shit'
+    # struct_cpp = struct_cpp[:struct_cpp.find(cpp_file_marker)]
+    # if struct_cpp.find(cpp_file_marker) == -1:
+    #     struct_cpp += f'\n{cpp_file_marker}\n\n'
+    #
+    struct_cpp = re.sub(r'//\s*pycstruct_shit.*', '//pycstruct_shit\n', struct_cpp, flags=re.DOTALL)
 
     registers:str = ''
     static_instances:str = ''
+    if_statements:str = ''
 
     for struct_type, struct_name in find_registrations(source_files):
         if struct_type not in defined_structs:
             ValueError("Registered a struct that doesn't have a definition")
 
-        registers += '    ' + '\n    '.join(defined_structs[struct_type].reg_macros('_'+struct_name))
+        registers += f'    REGISTER_INTERNAL_STRUCT(_{struct_type}, {struct_name})\n'
+        registers += '    ' + '\n    '.join(defined_structs[struct_type].reg_macros(struct_name))
 
-        static_instances += (f'static struct _{struct_type} {{{defined_structs[struct_type].raw_body}}} _{struct_name};\n')
+        static_instances += f'static struct _{struct_type} {{{defined_structs[struct_type].raw_body}}} {struct_name};\n'
+
+        if_statements  += '    ' + '\n    '.join(defined_structs[struct_type].if_print_statements(struct_name))
 
 
-    init_def = f'void init()\n{{\n{registers}\n}}\n\n'
-    struct_cpp = re.sub(r'void init\(\)\s*\{.*\}', init_def, struct_cpp, flags=re.DOTALL)
+    instance_def = f'{static_instances}\n\n'
+    init_def = f'void init_structs()\n{{\n{registers}\n}}\n\n'
+    print_func_def = f'void set_var(std::string structname, std::string varname)\n{{\n{if_statements}\n}}\n\n'
 
-    instance_def = f'//@struct_instances\n{static_instances}\n//@struct_instances\n'
-    struct_cpp = re.sub(r'//@struct_instances\s*.*//@struct_instances', instance_def, struct_cpp, flags=re.DOTALL)
+    struct_cpp += instance_def + init_def + print_func_def
 
     with open('structs.cpp', 'w') as f:
         f.write(struct_cpp)
-
-    # member_if_statements:str = ''
-    # for reg_type, reg_name in find_registrations(source_file):
-    #     if reg_type not in defined_structs:
-    #         ValueError(f"Don't have definition for {reg_type}")
-    #
-    #     for var in defined_structs[reg_type].vars:
-    #         member_if_statements += f'if (arg == {reg_name}.{var.name})\n'
-    #
-    # print(member_if_statements)
-
 
 
 
@@ -443,17 +466,5 @@ def main() -> None:
 if __name__ == "__main__":
     main()
     
-
-
-
-
-
-
-
-
-
-
-
-
 
 

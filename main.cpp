@@ -1,21 +1,20 @@
-#include <cassert>
-#include <iostream>
-
 #include "structs.h"
 
+#include <iostream>
 
 struct Test {
-  int a;
-  uint32_t b : 10, : 6, c : 12, : 4;
-  long long d;
-  float f;
+    int a;
+    unsigned int b : 10, : 6, c : 12, : 4;
+    long long d;
+    float f;
 };
 
 REGISTER_STRUCT(Test, test);
 
 int main() {
+    init_structs();
 
-
+    print_var("test", "d");
 }
 
 /*
