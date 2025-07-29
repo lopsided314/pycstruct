@@ -9,29 +9,17 @@ struct Test {
     float f;
 };
 
+struct Test2 {
+    const char* str;
+    double dd;
+};
+
 REGISTER_STRUCT(Test, test);
+REGISTER_STRUCT(Test2, test2);
 
 int main() {
     init_structs();
 
-    print_var("test", "d");
+    set_var("test2", "dd", ".40");
+    print_var("test2", "dd");
 }
-
-/*
- * take in input from command line that is determined to either be a read or
- write
- * determine the struct and member name from parsing the input
- *
- * if write function:
- *      if bitfield:
- *          read full size of struct from memory into local struct
- *      turn input into correct data type
-        set local struct member to value
-        if bitfield:
- *          return the address and size of the local struct
- *      else:
- *          return the address and size of the member variable
- *      write those bytes to whatever
- *
- *
- * */

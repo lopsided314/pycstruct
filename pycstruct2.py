@@ -296,7 +296,8 @@ class ObjectFrame:
                 if_checks += [f'if (structname == "{base_name}" && varname == "{self.combo_name}{f}") {{}}']
                 
 
-        print(f'\n\n\n{'\n'.join(if_checks)}\n\n\n')
+        if_check_str = '\n'.join(if_checks)
+        print(f'\n\n\n{if_check_str}\n\n\n')
 
         return if_checks
 
