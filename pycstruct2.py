@@ -63,43 +63,43 @@ def deformat_source(struct_def:str) -> str:
 #
 #     return '\n'.join(lines)
 
-ctype_fmts:dict[str, tuple[str,str]] = {
-    'bool':('u8', '%1X'),
-    'int8_t':('i8', '%3d'),
-    'char':('i8', '%3d'),
-    'signed char':('i8', '%3d'),
-    'uint8_t': ('u8', '%02X'),
-    'unsigned char': ('u8', '%02X'),
-    'int16_t':('i16', '%5d'),
-    'short': ('i16', '%5d'),
-    'short int': ('i16', '%5d'),
-    'signed short': ('i16', '%5d'),
-    'signed short int': ('i16', '%5d'),
-    'uint16_t':('u16', '%04X'),
-    'unsigned short': ('u16', '%04X'),
-    'unsigned short int': ('u16', '%04X'),
-    'int32_t': ('i32', '%9d'),
-    'int': ('i32', '%9d'),
-    'signed': ('i32', '%9d'),
-    'signed int': ('i32', '%9d'),
-    'uint32_t': ('u32', '%08X'),
-    'unsigned int': ('u32', '%08X'),
-    'int64_t': ('i64', '%20lld'),
-    'long': ('i64', '%20lld'),
-    'long int': ('i64', '%20lld'),
-    'signed long': ('i64', '%20lld'),
-    'signed long int': ('i64', '%20lld'),
-    'long long': ('i64', '%20lld'),
-    'long long int': ('i64', '%20lld'),
-    'signed long long': ('i64', '%20lld'),
-    'signed long long int': ('i64', '%20lld'),
-    'uint64_t': ('u64', '%016llX'),
-    'unsigned long': ('u64', '%016llX'),
-    'unsigned long int': ('u64', '%016llX'),
-    'unsigned long long': ('u64', '%016llX'),
-    'unsigned long long int': ('u64', '%016llX'),
-    'float': ('f32', '%14.4e'),
-    'double': ('f64','%14.4e') ,
+ctype_fmts:dict[str, tuple[str,str,str]] = {
+    'bool':('u8', '%1X', 'stoul_0x'),
+    'int8_t':('i8', '%3d', 'stol'),
+    'char':('i8', '%3d', 'stol'),
+    'signed char':('i8', '%3d', 'stol'),
+    'uint8_t': ('u8', '%02X', 'stoul_0x'),
+    'unsigned char': ('u8', '%02X', 'stoul_0x'),
+    'int16_t':('i16', '%5d', 'stol'),
+    'short': ('i16', '%5d', 'stol'),
+    'short int': ('i16', '%5d', 'stol'),
+    'signed short': ('i16', '%5d', 'stol'),
+    'signed short int': ('i16', '%5d', 'stol'),
+    'uint16_t':('u16', '%04X', 'stoul_0x'),
+    'unsigned short': ('u16', '%04X', 'stoul_0x'),
+    'unsigned short int': ('u16', '%04X', 'stoul_0x'),
+    'int32_t': ('i32', '%9d', 'stol'),
+    'int': ('i32', '%9d', 'stol'),
+    'signed': ('i32', '%9d', 'stol'),
+    'signed int': ('i32', '%9d', 'stol'),
+    'uint32_t': ('u32', '%08X', 'stoul_0x'),
+    'unsigned int': ('u32', '%08X', 'stoul_0x'),
+    'int64_t': ('i64', '%20lld', 'stol'),
+    'long': ('i64', '%20lld', 'stol'),
+    'long int': ('i64', '%20lld', 'stol'),
+    'signed long': ('i64', '%20lld', 'stol'),
+    'signed long int': ('i64', '%20lld', 'stol'),
+    'long long': ('i64', '%20lld', 'stol'),
+    'long long int': ('i64', '%20lld', 'stol'),
+    'signed long long': ('i64', '%20lld', 'stol'),
+    'signed long long int': ('i64', '%20lld', 'stol'),
+    'uint64_t': ('u64', '%016llX', 'stoul_0x'),
+    'unsigned long': ('u64', '%016llX', 'stoul_0x'),
+    'unsigned long int': ('u64', '%016llX', 'stoul_0x'),
+    'unsigned long long': ('u64', '%016llX', 'stoul_0x'),
+    'unsigned long long int': ('u64', '%016llX', 'stoul_0x'),
+    'float': ('f32', '%14.4e', 'stod'),
+    'double': ('f64','%14.4e', 'stod') ,
 }
 
 
@@ -263,16 +263,18 @@ class ObjectFrame:
 
         for v in self.vars:
             if v.ctype in ctype_fmts:
+                _, printf, stonum = ctype_fmts[v.ctype]
                 if v.size == '0':
-                    macros.append(f'REGISTER_VAR({base_name}, {self.combo_name}{v.name}, {v.ctype}, "{ctype_fmts[v.ctype][1]}")')
+                    macros.append(f'REGISTER_VAR({base_name}, {self.combo_name}{v.name}, {v.ctype}, "{printf}", {stonum})')
                 else:
-                    macros.append(f'REGISTER_ARR({base_name}, {self.combo_name}{v.name}, {v.size}, {v.ctype}, "{ctype_fmts[v.ctype][1]}")')
+                    macros.append(f'REGISTER_ARR({base_name}, {self.combo_name}{v.name}, {v.size}, {v.ctype}, "{printf}", {stonum})')
 
         
         for b in self.bitfields:
             if b.ctype in ctype_fmts:
+                _, printf, stonum = ctype_fmts[b.ctype]
                 for name, _ in b.fields:
-                    macros.append(f'REGISTER_BITFIELD({base_name}, {self.combo_name}{name}, {b.ctype}, {ctype_fmts[b.ctype]})')
+                    macros.append(f'REGISTER_BITFIELD({base_name}, {self.combo_name}{name}, {b.ctype}, "{printf}", {stonum})')
 
 
         return macros

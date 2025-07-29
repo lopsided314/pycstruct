@@ -5,7 +5,7 @@
 struct Test {
     int a;
     unsigned int b : 10, : 6, c : 12, : 4;
-    long long d;
+    long long d[4];
     float f;
 };
 

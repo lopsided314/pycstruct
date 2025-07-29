@@ -2,11 +2,11 @@
 
 #include <string>
 
-
+// used by pycstruct
 #define REGISTER_STRUCT(a, b) 
 
 void init_structs();
-void print_var(std::string structname, std::string varname);
+void print_var(std::string structname, std::string varname, std::string extra_args = "n");
 
 struct StructData {
     void *data;
