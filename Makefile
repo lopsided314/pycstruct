@@ -6,5 +6,5 @@ PYTHON=python3
 
 
 all:
+	python3 pycstruct2.py
 	$(CXX) $(FLAGS) $(STD) structs.cpp main.cpp -o $(EXE)
-	# python3 pycstruct2.py

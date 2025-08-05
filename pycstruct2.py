@@ -295,10 +295,6 @@ class ObjectFrame:
             for f, _ in b.fields:
                 if_checks += [f'if (structname == "{base_name}" && varname == "{self.combo_name}{f}") {{}}']
                 
-
-        if_check_str = '\n'.join(if_checks)
-        print(f'\n\n\n{if_check_str}\n\n\n')
-
         return if_checks
 
     def _get_frames(self) -> None:
@@ -430,17 +426,11 @@ def main() -> None:
 
     with open('structs.cpp') as f:
         struct_cpp:str = f.read()
-    #
-    # cpp_file_marker = 'pycstruct_shit'
-    # struct_cpp = struct_cpp[:struct_cpp.find(cpp_file_marker)]
-    # if struct_cpp.find(cpp_file_marker) == -1:
-    #     struct_cpp += f'\n{cpp_file_marker}\n\n'
-    #
+
     struct_cpp = re.sub(r'//\s*pycstruct_shit.*', '//pycstruct_shit\n', struct_cpp, flags=re.DOTALL)
 
     registers:str = ''
     static_instances:str = ''
-    if_statements:str = ''
 
     for struct_type, struct_name in find_registrations(source_files):
         if struct_type not in defined_structs:
@@ -451,14 +441,11 @@ def main() -> None:
 
         static_instances += f'static struct _{struct_type} {{{defined_structs[struct_type].raw_body}}} {struct_name};\n'
 
-        if_statements  += '    ' + '\n    '.join(defined_structs[struct_type].if_print_statements(struct_name))
-
 
     instance_def = f'{static_instances}\n\n'
     init_def = f'void init_structs()\n{{\n{registers}\n}}\n\n'
-    print_func_def = f'void set_var(std::string structname, std::string varname)\n{{\n{if_statements}\n}}\n\n'
 
-    struct_cpp += instance_def + init_def + print_func_def
+    struct_cpp += instance_def + init_def
 
     with open('structs.cpp', 'w') as f:
         f.write(struct_cpp)
