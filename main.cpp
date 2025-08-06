@@ -20,6 +20,19 @@ REGISTER_STRUCT(Test2, test2);
 int main() {
     init_structs();
 
-    set_var("test2", "dd", ".40");
+    set_var("test2", "dd", {".40"});
     print_var("test2", "dd");
+
+
+    set_var("test", "d", {"-1", "-2", "-3"});
+    print_var("test", "d", {"1"});
+
+    uint8_t data[0x1000];
+
+
+
+    auto sd = get_data("test", "c");
+
+
+
 }
