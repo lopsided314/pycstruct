@@ -8,29 +8,18 @@
 #define REGISTER_STRUCT(a, b)
 
 void init_structs();
-void print_var(std::string structname, std::string varname,
-               JStringList extra_args = {});
-void set_var(std::string structname, std::string varname,
-             JStringList extra_args = {});
 
 enum VarType : int { Std, BField, Array };
-
-struct VarData {
-    VarType type;
-    void *data;
-    size_t size;
-};
-
-VarData get_data(std::string structname, std::string varname);
 
 struct Var {
     VarType type;
     uint8_t *data;
     size_t size;
+    size_t sizeof_ctype;
     ssize_t offset;
     std::string name;
-    std::function<void(JStringList)> set;
-    std::function<void(JStringList)> print;
+    std::function<void(const JStringList &)> set;
+    std::function<void(const JStringList &)> print;
 };
 
 struct Struct {
@@ -38,7 +27,7 @@ struct Struct {
     size_t size;
     std::string name;
     std::string type;
-    std::function<void(JStringList)> print;
+    std::function<void(const JStringList &)> print;
     std::map<std::string, Var> vars;
     size_t working_addr;
 };
@@ -50,19 +39,14 @@ struct StructFind {
 
 StructFind get_struct(std::string structname, std::string varname);
 
+enum StructOperation { ERROR, READ, WRITE, WRITE_BITFIELD, PASS };
+
 struct StructParseOutput {
-    enum Operation {
-        ERROR,
-        PRINT,
-        SET,
-        SET_BITFIELD,
-        SET_ARRAY,
-        PASS
-    } op;
-    Struct *s;
-    Var *v;
-    uint8_t *data;
-    size_t size;
+    enum StructOperation op = ERROR;
+    Struct *s = nullptr;
+    Var *v = nullptr;
+    uint8_t *data = nullptr;
+    size_t size = 0;
 };
 
-//Current: parse function that returns this shit
+StructParseOutput parse_struct_input(const JStringList &args);

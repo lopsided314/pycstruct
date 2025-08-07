@@ -35,6 +35,15 @@ inline bool contains_all(const std::string &str, std::string chars) {
     return true;
 }
 
+inline size_t count(const std::string &str, std::string key) {
+    size_t start = 0, stop = 0, count = 0;
+    while ((start = str.find(key, stop)) != std::string::npos) {
+        count++;
+        stop = start + key.length();
+    }
+    return count;
+}
+
 /*=====================================================================*/
 
 inline void lower(std::string *str) {
@@ -142,7 +151,7 @@ inline std::string strip(std::string str, StripBehavior sb = Both) {
 const static int32_t end = INT32_MAX;
 inline void slice(std::string *str, int start, int stop) {
     assert(str != nullptr);
-    int32_t len = str->length();
+    const int32_t len = str->length();
 
     if (start < 0) {
         start = len + start;
@@ -271,8 +280,7 @@ inline JStringList split(std::string str, std::string key, int sb = None) {
         strs.push_back(str.substr(stop, start - stop));
         stop = start + key.length();
     }
-    if (stop != str.length())
-        strs.push_back(str.substr(stop, std::string::npos));
+    strs.push_back(str.substr(stop, std::string::npos));
 
     if (sb & TrimAll) {
         for (std::string &s : strs) {
