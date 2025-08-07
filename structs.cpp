@@ -1,33 +1,14 @@
 #include "structs.h"
+#include "jstrings.hpp"
 
 #include <cassert>
-#include <functional>
 #include <iostream>
-#include <map>
 #include <stdint.h>
 #include <stdio.h>
 
+static std::string g_err;
+
 namespace js = JStrings;
-
-struct Var {
-    uint8_t *data;
-    size_t size;
-    ssize_t offset;
-    std::string name;
-    std::function<void(JStringList)> set;
-    std::function<void(JStringList)> print;
-};
-
-struct Struct {
-    uint8_t *data;
-    size_t size;
-    std::string name;
-    std::string type;
-    std::function<void(JStringList)> print;
-    std::map<std::string, Var> vars;
-    size_t working_addr;
-};
-
 std::map<std::string, Struct> g_structs;
 
 #define REGISTER_INTERNAL_STRUCT(structtype, sname)                            \
@@ -47,15 +28,17 @@ std::map<std::string, Struct> g_structs;
     assert(g_structs.count(#sname) &&                                          \
            "Trying to register var with unregistered struct: " #sname);        \
     g_structs[#sname].vars[#vname] = Var{                                      \
+        .type = VarType::Std,                                                  \
         .data = (uint8_t *)&sname.vname,                                       \
         .size = sizeof(sname.vname),                                           \
         .offset = (ssize_t) & sname.vname - (ssize_t) & sname,                 \
         .name = #vname,                                                        \
         .set =                                                                 \
             [](JStringList args) {                                             \
-                bool ok;                                                       \
-                ctype val = js::stonum(args[0], &ok);                          \
-                if (ok)                                                        \
+                ctype val = js::stonum(args[0], nullptr, &g_err);              \
+                if (g_err.length() > 0)                                        \
+                    std::cout << "Failed " << g_err << "\n";                   \
+                else                                                           \
                     sname.vname = val;                                         \
             },                                                                 \
         .print =                                                               \
@@ -68,15 +51,17 @@ std::map<std::string, Struct> g_structs;
     assert(g_structs.count(#sname) &&                                          \
            "Trying to register var with unregistered struct: " #sname);        \
     g_structs[#sname].vars[#vname] = Var{                                      \
+        .type = VarType::BField,                                               \
         .data = (uint8_t *)&sname,                                             \
         .size = sizeof(sname),                                                 \
-        .offset = -1,                                                          \
+        .offset = 0,                                                           \
         .name = #vname,                                                        \
         .set =                                                                 \
             [](JStringList args) {                                             \
-                bool ok;                                                       \
-                ctype val = js::stonum(args[0], &ok);                          \
-                if (ok)                                                        \
+                ctype val = js::stonum(args[0], nullptr, &g_err);              \
+                if (g_err.length() > 0)                                        \
+                    std::cout << "Failed " << g_err << "\n";                   \
+                else                                                           \
                     sname.vname = val;                                         \
             },                                                                 \
         .print =                                                               \
@@ -89,26 +74,30 @@ std::map<std::string, Struct> g_structs;
     assert(g_structs.count(#sname) &&                                          \
            "Trying to register var with unregistered struct: " #sname);        \
     g_structs[#sname].vars[#vname] = Var{                                      \
+        .type = VarType::Array,                                                \
         .data = (uint8_t *)&sname.vname,                                       \
         .size = sizeof(sname.vname),                                           \
         .offset = (ssize_t) & sname.vname - (ssize_t) & sname,                 \
         .name = #vname,                                                        \
         .set =                                                                 \
             [](JStringList args) {                                             \
-                bool ok;                                                       \
                 for (size_t i = 0; i < args.size() && i < length; i++) {       \
-                    ctype val = js::stonum(args[i], &ok);                      \
-                    if (!ok)                                                   \
+                    ctype val = js::stonum(args[i], nullptr, &g_err);          \
+                    if (g_err.size() > 0) {                                    \
+                        std::cout << "Failed " << g_err << "\n";               \
                         return;                                                \
-                    sname.vname[i] = val;                                      \
+                    } else {                                                   \
+                        sname.vname[i] = val;                                  \
+                    }                                                          \
                 }                                                              \
             },                                                                 \
         .print =                                                               \
             [](JStringList args) {                                             \
                 if (args.size() > 0) {                                         \
-                    bool ok;                                                   \
-                    int i = js::stol(args[0], &ok);                            \
-                    if (!ok)                                                   \
+                    int i = js::stol(args[0], nullptr, &g_err);                \
+                    if (g_err.size() > 0)                                      \
+                        std::cout << "Failed " << g_err << "\n";               \
+                    else                                                       \
                         printf(#sname "->" #vname "[%3d] = " printf_fmt "\n",  \
                                i, sname.vname[i]);                             \
                     return;                                                    \
@@ -139,12 +128,104 @@ VarData get_data(std::string sname, std::string vname) {
     if (g_structs.count(sname) && g_structs[sname].vars.count(vname)) {
         auto var = g_structs[sname].vars[vname];
         return VarData{
+            .type = var.type,
             .data = var.data + g_structs[sname].working_addr,
             .size = var.size,
         };
     } else {
         std::cout << "struct " << sname << "->" << vname << " not found'\n";
-        return VarData{.data = nullptr, .size = 0};
+        return VarData{.type = VarType::Std, .data = nullptr, .size = 0};
+    }
+}
+
+StructFind get_struct(std::string sname, std::string vname) {
+
+    if (js::contains_all(vname, "[]")) {
+        js::slice(&vname, 0, vname.find('['));
+    }
+    if (g_structs.count(sname)) {
+        if (g_structs[sname].vars.count(vname)) {
+            auto var = g_structs[sname].vars[vname];
+            return StructFind{
+                .s = &g_structs[sname],
+                .v = &g_structs[sname].vars[vname],
+            };
+        } else {
+            return StructFind{
+                .s = &g_structs[sname],
+                .v = nullptr,
+            };
+        }
+    } else {
+        std::cout << "struct " << sname << "->" << vname << " not found'\n";
+    }
+    return {};
+}
+
+void parse_struct_input(JStringList args) {
+    if (args.size() < 2) {
+        std::cout << "Invalid args for struct operation\n";
+        return;
+    }
+
+    auto sv_name_split = js::split(args[1], "->", js::SkipEmpty | js::TrimAll);
+
+    if (sv_name_split.size() != 2) {
+        std::cout << "Invalid struct name\n";
+        return;
+    }
+
+    auto sv = get_struct(sv_name_split[0], sv_name_split[1]);
+
+    if (!sv.s) {
+        std::cout << "Couldn't find struct \"" << sv_name_split[0] << "\"\n";
+        return;
+    }
+
+    bool addr_cmd = args[0] == "com";
+    bool write_cmd = args[0] == "co";
+    bool read_cmd = args[0] == "ci";
+
+    if ((addr_cmd && args.size() != 3) || (addr_cmd && sv.v)) {
+        std::cout << "Invalid args for setting struct address\n";
+        return;
+    } else if (addr_cmd) {
+        size_t new_addr = js::stoul_0x(args[2], &g_err);
+        if (g_err.length() > 0) {
+            std::cout << "set struct addr: " << g_err << "\n";
+        } else {
+            sv.s->working_addr = new_addr;
+        }
+        return;
+    }
+
+    if (!sv.v) {
+        std::cout << "Couldn't find \"" << args[1] << "\"\n";
+        return;
+    }
+
+    if (read_cmd && args.size() != 2) {
+        std::cout << "Invalid args for reading struct member\n";
+        return;
+    } else if (read_cmd) {
+        if (sv.v->type == VarType::Array &&
+            js::contains_all(sv_name_split[1], "[]")) {
+            std::string arr_index =
+                js::slice(sv_name_split[1], sv_name_split[1].find('['), -1);
+            sv.v->print({arr_index});
+        } else {
+            sv.v->print({});
+        }
+        return;
+    }
+
+    if (write_cmd && args.size() < 3) {
+        std::cout << "Invalid args for reading struct member\n";
+        return;
+    } else if (write_cmd) {
+        if (sv.v->type == VarType::BField) {
+
+        }
     }
 }
 
@@ -152,19 +233,25 @@ VarData get_data(std::string sname, std::string vname) {
  * EVERYTHING IN THIS FILE AFTER THIS LINE WILL BE OVERWRITTEN
  */
 
-//pycstruct_shit
-static struct _Test { int a ; unsigned int b:10 , :6 , c:12 , :4 ; long long d [ 4 ] ; float f ; } test;
-static struct _Test2 { const char * str ; double dd ; } test2;
+// pycstruct_shit
+static struct _Test {
+    int a;
+    unsigned int b : 10, : 6, c : 12, : 4;
+    long long d[4];
+    float f;
+} test;
+static struct _Test2 {
+    const char *str;
+    double dd;
+} test2;
 
-
-void init_structs()
-{
+void init_structs() {
     REGISTER_INTERNAL_STRUCT(_Test, test)
     REGISTER_VAR(test, a, int, "%9d", stol)
     REGISTER_ARR(test, d, 4, long long, "%20lld", stol)
     REGISTER_VAR(test, f, float, "%14.4e", stod)
     REGISTER_BITFIELD(test, b, unsigned int, "%08X", stoul_0x)
-    REGISTER_BITFIELD(test, c, unsigned int, "%08X", stoul_0x)    REGISTER_INTERNAL_STRUCT(_Test2, test2)
+    REGISTER_BITFIELD(test, c, unsigned int, "%08X", stoul_0x)
+    REGISTER_INTERNAL_STRUCT(_Test2, test2)
     REGISTER_VAR(test2, dd, double, "%14.4e", stod)
 }
-

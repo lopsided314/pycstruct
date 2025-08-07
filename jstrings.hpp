@@ -15,11 +15,11 @@ namespace JStrings {
 
 /*=====================================================================*/
 
-inline bool contains(const std::string& str, std::string key) {
+inline bool contains(const std::string &str, std::string key) {
     return str.find(key) != std::string::npos;
 }
 
-inline bool contains_any(const std::string& str, std::string chars) {
+inline bool contains_any(const std::string &str, std::string chars) {
     for (char c : chars) {
         if (str.find(c) != std::string::npos)
             return true;
@@ -27,7 +27,7 @@ inline bool contains_any(const std::string& str, std::string chars) {
     return false;
 }
 
-inline bool contains_all(const std::string& str, std::string chars) {
+inline bool contains_all(const std::string &str, std::string chars) {
     for (char c : chars) {
         if (str.find(c) == std::string::npos)
             return false;
@@ -177,7 +177,7 @@ inline std::string slice(std::string str, int start, int stop) {
 enum ReplaceBehavior : int { First = 1, Last = 2, All = First | Last };
 
 inline void replace(std::string *str, std::string key, std::string sub,
-                    ReplaceBehavior rb = All) {
+                    int rb = All) {
     assert(str != nullptr);
 
     if (str->find(key) == std::string::npos || key.length() == 0)
@@ -231,20 +231,18 @@ inline void replace(std::string *str, std::string key, std::string sub,
     }
 }
 inline std::string replace(std::string str, std::string key, std::string sub,
-                           ReplaceBehavior rb = All) {
+                           int rb = All) {
     JStrings::replace(&str, key, sub, rb);
     return str;
 }
 
 /*=====================================================================*/
 
-inline void remove(std::string *str, std::string key,
-                   ReplaceBehavior rb = All) {
+inline void remove(std::string *str, std::string key, int rb = All) {
     assert(str != nullptr);
     JStrings::replace(str, key, "", rb);
 }
-inline std::string remove(std::string str, std::string key,
-                          ReplaceBehavior rb = All) {
+inline std::string remove(std::string str, std::string key, int rb = All) {
     JStrings::remove(&str, key, rb);
     return str;
 }
@@ -253,8 +251,7 @@ inline std::string remove(std::string str, std::string key,
 
 enum SplitBehavior : int { None = 0, SkipEmpty = 1, TrimAll = 2 };
 
-inline JStringList split(std::string str, std::string key,
-                         SplitBehavior sb = None) {
+inline JStringList split(std::string str, std::string key, int sb = None) {
     if (str.find(key) == std::string::npos) {
         return {str};
     }
@@ -309,9 +306,9 @@ inline std::string join(const JStringList &strs, std::string sep,
 
 /*=====================================================================*/
 
-inline unsigned long stoul_0x(std::string str, bool *ok) {
-    if (ok)
-        *ok = false;
+inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
+    if (err)
+        *err = "";
 
     unsigned long val = 0;
     size_t idx = 0;
@@ -319,22 +316,27 @@ inline unsigned long stoul_0x(std::string str, bool *ok) {
     try {
         val = std::stoul(str, &idx, 16);
     } catch (const std::invalid_argument &) {
+        if (err)
+            *err = "stoul_0x(" + str + "): invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
+        if (err)
+            *err = "stoul_0x(" + str + "): out_of_range";
         return val;
     }
 
-    if (idx != str.length())
+    if (idx != str.length()) {
+        if (err)
+            *err = "stoul_0x(" + str + "): invalid_argument";
         return val;
+    }
 
-    if (ok)
-        *ok = true;
     return val;
 }
 
-inline long stol(std::string str, bool *ok) {
-    if (ok)
-        *ok = false;
+inline long stol(std::string str, std::string *err = nullptr) {
+    if (err)
+        *err = "";
 
     long val = 0;
     size_t idx = 0;
@@ -342,22 +344,25 @@ inline long stol(std::string str, bool *ok) {
     try {
         val = std::stol(str, &idx);
     } catch (const std::invalid_argument &) {
+        if (err)
+            *err = "stol(" + str + "): invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
+        if (err)
+            *err = "stol(" + str + "): out_of_range";
         return val;
     }
 
-    if (idx != str.length())
+    if (idx != str.length()) {
+        if (err)
+            *err = "stol(" + str + "): invalid_argument";
         return val;
+    }
 
-    if (ok)
-        *ok = true;
     return val;
 }
 
-inline double stod(std::string str, bool *ok) {
-    if (ok)
-        *ok = false;
+inline double stod(std::string str, std::string *err = nullptr) {
 
     double val = 0;
     size_t idx = 0;
@@ -367,18 +372,25 @@ inline double stod(std::string str, bool *ok) {
         if (JStrings::contains(str, "e")) {
             JStringList spl = JStrings::split(str, "e", TrimAll);
             if (spl.size() != 2) {
+                if (err)
+                    *err = "stod(" + str + "): Invalid scientific notation";
                 return val;
             }
 
             int exponent = 0;
             val = std::stod(spl[0], &idx);
-            if (idx != spl[0].length())
+            if (idx != spl[0].length()) {
+                if (err)
+                    *err = "stod(" + str + "): invalid mantissa";
                 return val;
+            }
 
             exponent = std::stol(spl[1], &idx);
-            if (idx != spl[1].length())
+            if (idx != spl[1].length()) {
+                if (err)
+                    *err = "stod(" + str + "): invalid exponent";
                 return val;
-
+            }
             double mul = exponent > 0 ? 10 : .1;
             exponent = abs(exponent);
 
@@ -387,17 +399,22 @@ inline double stod(std::string str, bool *ok) {
             }
         } else {
             val = std::stod(str, &idx);
-            if (idx != str.length())
+            if (idx != str.length()) {
+                if (err)
+                    *err = "stol(" + str + "): invalid_argument";
                 return val;
+            }
         }
     } catch (const std::invalid_argument &) {
+        if (err)
+            *err = "stod(" + str + "): invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
+        if (err)
+            *err = "stod(" + str + "): out_of_range";
         return val;
     }
 
-    if (ok)
-        *ok = true;
     return val;
 }
 
