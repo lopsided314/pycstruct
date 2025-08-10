@@ -291,7 +291,7 @@ inline JStringList split(std::string str, std::string key, int sb = None) {
         strs.erase(
             std::remove_if(strs.begin(), strs.end(), [](const std::string &s) {
                 return s.length() == 0;
-            }));
+            }), strs.end());
     }
 
     return strs;
@@ -299,7 +299,7 @@ inline JStringList split(std::string str, std::string key, int sb = None) {
 
 /*=====================================================================*/
 
-inline std::string join(const JStringList &strs, std::string sep,
+inline std::string join(const JStringList &strs, std::string sep = "\n",
                         std::string head = "", std::string tail = "") {
     if (strs.size() == 0)
         return "";
@@ -325,17 +325,17 @@ inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
         val = std::stoul(str, &idx, 16);
     } catch (const std::invalid_argument &) {
         if (err)
-            *err = "stoul_0x(" + str + "): invalid_argument";
+            *err = "stoul_0x(\"" + str + "\": invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
         if (err)
-            *err = "stoul_0x(" + str + "): out_of_range";
+            *err = "stoul_0x(\"" + str + "\": out_of_range";
         return val;
     }
 
     if (idx != str.length()) {
         if (err)
-            *err = "stoul_0x(" + str + "): invalid_argument";
+            *err = "stoul_0x(\"" + str + "\": invalid_argument";
         return val;
     }
 
@@ -353,17 +353,17 @@ inline long stol(std::string str, std::string *err = nullptr) {
         val = std::stol(str, &idx);
     } catch (const std::invalid_argument &) {
         if (err)
-            *err = "stol(" + str + "): invalid_argument";
+            *err = "stol(\"" + str + "\": invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
         if (err)
-            *err = "stol(" + str + "): out_of_range";
+            *err = "stol(\"" + str + "\": out_of_range";
         return val;
     }
 
     if (idx != str.length()) {
         if (err)
-            *err = "stol(" + str + "): invalid_argument";
+            *err = "stol(\"" + str + "\": invalid_argument";
         return val;
     }
 
@@ -381,7 +381,7 @@ inline double stod(std::string str, std::string *err = nullptr) {
             JStringList spl = JStrings::split(str, "e", TrimAll);
             if (spl.size() != 2) {
                 if (err)
-                    *err = "stod(" + str + "): Invalid scientific notation";
+                    *err = "stod(\"" + str + "\": Invalid scientific notation";
                 return val;
             }
 
@@ -389,14 +389,14 @@ inline double stod(std::string str, std::string *err = nullptr) {
             val = std::stod(spl[0], &idx);
             if (idx != spl[0].length()) {
                 if (err)
-                    *err = "stod(" + str + "): invalid mantissa";
+                    *err = "stod(\"" + str + "\": invalid mantissa";
                 return val;
             }
 
             exponent = std::stol(spl[1], &idx);
             if (idx != spl[1].length()) {
                 if (err)
-                    *err = "stod(" + str + "): invalid exponent";
+                    *err = "stod(\"" + str + "\": invalid exponent";
                 return val;
             }
             double mul = exponent > 0 ? 10 : .1;
@@ -409,17 +409,17 @@ inline double stod(std::string str, std::string *err = nullptr) {
             val = std::stod(str, &idx);
             if (idx != str.length()) {
                 if (err)
-                    *err = "stol(" + str + "): invalid_argument";
+                    *err = "stol(\"" + str + "\": invalid_argument";
                 return val;
             }
         }
     } catch (const std::invalid_argument &) {
         if (err)
-            *err = "stod(" + str + "): invalid_argument";
+            *err = "stod(\"" + str + "\": invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
         if (err)
-            *err = "stod(" + str + "): out_of_range";
+            *err = "stod(\"" + str + "\": out_of_range";
         return val;
     }
 
@@ -433,10 +433,9 @@ template <typename Number_t> inline std::string as_bin(Number_t val) {
     uint64_t data = 0;
     memcpy(&data, &val, sizeof(val));
 
-    size_t buf_size = sizeof(val) * 8 + sizeof(val) - 1 + 1;
-    char buf[buf_size];
-    buf[buf_size - 1] = '\0';
-    for (int iBit = 0, iBuf = buf_size - 2; iBit < sizeof(val) * 8 && iBuf >= 0;
+    size_t str_end = sizeof(val) * 8 + sizeof(val) - 1 + 1;
+    char buf[64] = {0};
+    for (int iBit = 0, iBuf = str_end - 2; iBit < sizeof(val) * 8 && iBuf >= 0;
          iBit++, iBuf--) {
         if (iBit > 0 && (iBit % 8 == 0)) {
             buf[iBuf] = '_';

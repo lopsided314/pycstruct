@@ -85,10 +85,10 @@ ctype_fmts:dict[str, tuple[str,str,str]] = {
     'uint32_t': ('u32', '%08X', 'stoul_0x'),
     'unsigned int': ('u32', '%08X', 'stoul_0x'),
     'int64_t': ('i64', '%20lld', 'stol'),
-    'long': ('i64', '%20lld', 'stol'),
-    'long int': ('i64', '%20lld', 'stol'),
-    'signed long': ('i64', '%20lld', 'stol'),
-    'signed long int': ('i64', '%20lld', 'stol'),
+    'long': ('i64', '%20ld', 'stol'),
+    'long int': ('i64', '%20ld', 'stol'),
+    'signed long': ('i64', '%20ld', 'stol'),
+    'signed long int': ('i64', '%20ld', 'stol'),
     'long long': ('i64', '%20lld', 'stol'),
     'long long int': ('i64', '%20lld', 'stol'),
     'signed long long': ('i64', '%20lld', 'stol'),
@@ -249,7 +249,7 @@ class ObjectFrame:
             if v.size == '0':
                 print(f"{{var}} {self.combo_type} {self.combo_name}: {v.ctype} {v.name};")
             else:
-                print(f"{{arrray}} {self.combo_type} {self.combo_name}: {v.ctype} {v.name}[{v.size}];")
+                print(f"{{array}} {self.combo_type} {self.combo_name}: {v.ctype} {v.name}[{v.size}];")
 
         
     def reg_macros(self, base_name) -> list[str]:
@@ -265,17 +265,19 @@ class ObjectFrame:
             if v.ctype in ctype_fmts:
                 _, printf, stonum = ctype_fmts[v.ctype]
                 if v.size == '0':
-                    macros.append(f'REGISTER_VAR({base_name}, {self.combo_name}{v.name}, {v.ctype}, "{printf}", {stonum})')
+                    macros.append(f'REGISTER_VAR({base_name}, {self.combo_name}{v.name}, {v.ctype}, "{printf}", {stonum});')
                 else:
-                    macros.append(f'REGISTER_ARR({base_name}, {self.combo_name}{v.name}, {v.size}, {v.ctype}, "{printf}", {stonum})')
+                    macros.append(f'REGISTER_ARR({base_name}, {self.combo_name}{v.name}, {v.size}, {v.ctype}, "{printf}", {stonum});')
 
         
         for b in self.bitfields:
             if b.ctype in ctype_fmts:
                 _, printf, stonum = ctype_fmts[b.ctype]
+                printf = printf.replace("0","")
                 for name, _ in b.fields:
-                    macros.append(f'REGISTER_BITFIELD({base_name}, {self.combo_name}{name}, {b.ctype}, "{printf}", {stonum})')
+                    macros.append(f'REGISTER_BITFIELD({base_name}, {self.combo_name}{name}, {b.ctype}, "{printf}", {stonum});')
 
+        macros.append('\n')
 
         return macros
 
@@ -436,7 +438,7 @@ def main() -> None:
         if struct_type not in defined_structs:
             ValueError("Registered a struct that doesn't have a definition")
 
-        registers += f'    REGISTER_INTERNAL_STRUCT(_{struct_type}, {struct_name})\n'
+        registers += f'    REGISTER_INTERNAL_STRUCT(_{struct_type}, {struct_name});\n'
         registers += '    ' + '\n    '.join(defined_structs[struct_type].reg_macros(struct_name))
 
         static_instances += f'static struct _{struct_type} {{{defined_structs[struct_type].raw_body}}} {struct_name};\n'
