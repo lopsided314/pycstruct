@@ -1,6 +1,6 @@
 #pragma once
 
-#include "jstrings.hpp"
+#include "utils/jstrings/jstrings.hpp"
 #include <functional>
 #include <map>
 #include <string>
@@ -37,7 +37,7 @@ struct StructFind {
 };
 StructFind get_struct(std::string structname, std::string varname);
 
-enum StructOperation { ERROR, READ, WRITE, WRITE_BITFIELD, PASS };
+enum StructOperation { ERROR, READ_VAR, READ_STRUCT, WRITE, WRITE_BITFIELD, PASS };
 
 struct StructParseOutput {
     enum StructOperation op = ERROR;

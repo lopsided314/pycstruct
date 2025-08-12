@@ -1,9 +1,7 @@
 #include "structs.h"
-#include "jstrings.hpp"
 
 #include <cassert>
 #include <iostream>
-#include <stdint.h>
 #include <stdio.h>
 #include <vector>
 
@@ -12,49 +10,20 @@ static std::string g_err;
 namespace js = JStrings;
 std::map<std::string, Struct> g_structs;
 
-#define _REGISTER_INTERNAL_STRUCT(structtype, sname)                                               \
-    g_structs[#sname] = Struct{(uint8_t *)&sname,                                                  \
-                               sizeof(sname),                                                      \
-                               #sname,                                                             \
-                               #structtype,                                                        \
-                               [](JStringList args) {                                              \
-                                   (void)args;                                                     \
-                                   printf(#sname " print\n");                                      \
-                               },                                                                  \
-                               {},                                                                 \
-                               0};
-
 #define REGISTER_INTERNAL_STRUCT(structtype, sname)                                                \
     g_structs[#sname] = Struct{};                                                                  \
     g_structs[#sname].data = (uint8_t *)&sname;                                                    \
     g_structs[#sname].size = sizeof(sname);                                                        \
     g_structs[#sname].name = #sname;                                                               \
     g_structs[#sname].type = #structtype;                                                          \
-    g_structs[#sname].print = [](JStringList args) {                                               \
+    g_structs[#sname].print = [](const JStringList &args) {                                        \
         (void)args;                                                                                \
-        printf(#sname " print\n");                                                                 \
+        for (const auto &var : g_structs[#sname].vars) {                                           \
+            var.second.print(args);                                                                \
+        }                                                                                          \
+        std::cout << "\n";                                                                         \
     };
 
-#define _REGISTER_VAR(sname, vname, ctype, printf_fmt, stonum)                                     \
-    assert(g_structs.count(#sname) && "Trying to register var with unregistered struct: " #sname); \
-    g_structs[#sname].vars[#vname] =                                                               \
-        Var{VarType::Std,                                                                          \
-            (uint8_t *)&sname.vname,                                                               \
-            sizeof(sname.vname),                                                                   \
-            sizeof(sname.vname),                                                                   \
-            (size_t)&sname.vname - (size_t)&sname,                                                 \
-            #vname,                                                                                \
-            [](JStringList args) {                                                                 \
-                ctype val = js::stonum(args[2], &g_err);                                           \
-                if (g_err.length() > 0)                                                            \
-                    std::cout << "Failed " << g_err << "\n";                                       \
-                else                                                                               \
-                    sname.vname = val;                                                             \
-            },                                                                                     \
-            [](JStringList args) {                                                                 \
-                (void)args;                                                                        \
-                printf(#sname "->" #vname " = " printf_fmt "\n", sname.vname);                     \
-            }};
 #define REGISTER_VAR(sname, vname, ctype, printf_fmt, stonum)                                      \
     assert(g_structs.count(#sname) && "Trying to register var with unregistered struct: " #sname); \
     g_structs[#sname].vars[#vname] = Var{};                                                        \
@@ -64,14 +33,14 @@ std::map<std::string, Struct> g_structs;
     g_structs[#sname].vars[#vname].sizeof_ctype = sizeof(sname.vname);                             \
     g_structs[#sname].vars[#vname].offset = (size_t)&sname.vname - (size_t)&sname;                 \
     g_structs[#sname].vars[#vname].name = #vname;                                                  \
-    g_structs[#sname].vars[#vname].set = [](JStringList args) {                                    \
+    g_structs[#sname].vars[#vname].set = [](const JStringList &args) {                             \
         ctype val = js::stonum(args[2], &g_err);                                                   \
         if (g_err.length() > 0)                                                                    \
             std::cout << "Failed " << g_err << "\n";                                               \
         else                                                                                       \
             sname.vname = val;                                                                     \
     };                                                                                             \
-    g_structs[#sname].vars[#vname].print = [](JStringList args) {                                  \
+    g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
         (void)args;                                                                                \
         printf(#sname "->" #vname " = " printf_fmt "\n", sname.vname);                             \
     };
@@ -96,34 +65,6 @@ std::map<std::string, Struct> g_structs;
         (void)args;                                                                                \
         printf(#sname "->" #vname " = " printf_fmt "\n", sname.vname);                             \
     };
-
-#define _REGISTER_ARR(sname, vname, length, ctype, printf_fmt, stonum)                             \
-    assert(g_structs.count(#sname) && "Trying to register var with unregistered struct: " #sname); \
-    g_structs[#sname].vars[#vname] =                                                               \
-        Var{VarType::Array,                                                                        \
-            (uint8_t *)&sname.vname,                                                               \
-            sizeof(sname.vname),                                                                   \
-            sizeof(ctype),                                                                         \
-            (size_t)&sname.vname - (size_t)&sname,                                                 \
-            #vname,                                                                                \
-            [](const JStringList &args) {                                                          \
-                std::vector<int> indices = get_array_indices(args[1], length);                     \
-                for (size_t i = 0; i < indices.size() && i < args.size(); i++) {                   \
-                    ctype val = js::stonum(args[i + 2], &g_err);                                   \
-                    if (g_err.size() > 0) {                                                        \
-                        std::cout << "Failed " << g_err << "\n";                                   \
-                        return;                                                                    \
-                    } else {                                                                       \
-                        sname.vname[indices[i]] = val;                                             \
-                    }                                                                              \
-                }                                                                                  \
-            },                                                                                     \
-            [](const JStringList &args) {                                                          \
-                auto indices = get_array_indices(args[1], length);                                 \
-                for (int i : indices) {                                                            \
-                    printf(#sname "->" #vname "[%3d] = " printf_fmt "\n", i, sname.vname[i]);      \
-                }                                                                                  \
-            }};
 
 #define REGISTER_ARR(sname, vname, length, ctype, printf_fmt, stonum)                              \
     assert(g_structs.count(#sname) && "Trying to register var with unregistered struct: " #sname); \
@@ -207,11 +148,7 @@ std::vector<int> get_array_indices(std::string vname, int index_limit) {
         int i = js::stol(s, &g_err);
         if (i < 0)
             i = index_limit + i;
-        if (g_err.length() > 0) {
-            std::cout << "Invalid array index: " << g_err << "\n";
-            return INDEX_ERR;
-        }
-        if (i < 0 || i > index_limit) {
+        if (g_err.length() > 0 || i < 0 || i > index_limit) {
             std::cout << "Invalid array index: " << s << "\n";
             return INDEX_ERR;
         }
@@ -291,12 +228,19 @@ StructParseOutput parse_struct_read_cmd(const StructFind &sv, const JStringList 
         return ret;
     }
 
-    ret.op = READ;
     ret.s = sv.s;
-    ret.v = sv.v;
-    ret.data = sv.v->data + sv.v->offset;
-    ret.size = sv.v->size;
-    ret.offset = sv.v->offset;
+    if (sv.v) {
+        ret.op = READ_VAR;
+        ret.v = sv.v;
+        ret.data = sv.v->data + sv.v->offset;
+        ret.size = sv.v->size;
+        ret.offset = sv.v->offset + sv.s->working_addr;
+    } else {
+        ret.op = READ_STRUCT;
+        ret.data = sv.s->data;
+        ret.size = sv.s->size;
+        ret.offset = sv.s->working_addr;
+    }
     return ret;
 }
 
@@ -312,10 +256,11 @@ StructParseOutput parse_struct_write_cmd(const StructFind &sv, const JStringList
     ret.v = sv.v;
     ret.data = sv.v->data + sv.v->offset;
     ret.size = sv.v->size;
-    ret.offset = sv.v->offset;
+    ret.offset = sv.v->offset + sv.s->working_addr;
 
     switch (sv.v->type) {
     case Std:
+
     case Array:
         sv.v->set(args);
         ret.op = WRITE;
@@ -349,13 +294,13 @@ StructParseOutput parse_struct_input(const JStringList &args) {
         return parse_struct_addr_cmd(sv, args);
     }
 
+    if (read_cmd) {
+        return parse_struct_read_cmd(sv, args);
+    }
+
     if (!sv.v) {
         std::cout << "Couldn't find \"" << args[1] << "\"\n";
         return {};
-    }
-
-    if (read_cmd) {
-        return parse_struct_read_cmd(sv, args);
     }
 
     if (write_cmd) {

@@ -1,4 +1,3 @@
-#include "jstrings.hpp"
 #include "structs.h"
 
 #include <iostream>
@@ -42,38 +41,44 @@ int main() {
                                          {"co", "test->c", "0xabcd"},
                                          {"ci", "test->c"},
                                          {"ci", "test->d"},
-                                         {"co", "test->d[1:4]", "3.34e-5", "12", "13"},
+                                         {"co", "test->d[1:4]", "3.3.4e-5", "12", "13"},
                                          {"ci", "test->d"},
                                          {"mv", "test->", "8"},
                                          {"co", "test->a", "-1"},
                                          {"mv", "test->", "0"},
-                                         {"ci", "test->d"}};
+                                         {"ci", "test->"}};
 
     for (const JStringList &args : arg_sets) {
 
         StructParseOutput cmd = parse_struct_input(args);
 
         switch (cmd.op) {
-        case READ:
-            read(cmd.data, cmd.size, cmd.offset + cmd.s->working_addr);
+        case READ_VAR:
+            read(cmd.data, cmd.size, cmd.offset);
             cmd.v->print(args);
             break;
 
+        case READ_STRUCT:
+            read(cmd.data, cmd.size, cmd.offset);
+            cmd.s->print(args);
+            break;
+
+
         case WRITE:
-            write(cmd.data, cmd.size, cmd.offset + cmd.s->working_addr);
+            write(cmd.data, cmd.size, cmd.offset);
             break;
 
         case WRITE_BITFIELD:
-            read(cmd.data, cmd.size, cmd.offset + cmd.s->working_addr);
+            read(cmd.data, cmd.size, cmd.offset);
             cmd.v->set(args);
-            write(cmd.data, cmd.size, cmd.offset + cmd.s->working_addr);
+            write(cmd.data, cmd.size, cmd.offset);
             break;
 
         case ERROR:
             return 0;
 
         case PASS:
-                std::cout << js::join(args, " ") << "\n";
+                std::cout << js::join(args, " ");
         default:
             break;
         }

@@ -1,0 +1,17 @@
+{
+    "One" : {
+        "One Int": 12,
+        "One Float": 0.12,
+        "One Array": [
+            0,1,2
+        ],
+        // comment
+        "One Object": {
+            "Two Int": -12,
+            "Two Float": 0.34,
+            "Two Array": [
+               "a", "b", "c" 
+            ]
+        }
+    }
+}
