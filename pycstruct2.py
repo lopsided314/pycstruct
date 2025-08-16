@@ -63,43 +63,57 @@ def deformat_source(struct_def:str) -> str:
 #
 #     return '\n'.join(lines)
 
+cli_types:dict[str, tuple[str, str, str]] = {
+    'i8': ('i8', '%3d', 'stol'),
+    'u8': ('u8', '%02X', 'stoul_0x'),
+    'i16': ('i16', '%5d', 'stol'),
+    'u16': ('u16', '%04X', 'stoul_0x'),
+    'i32': ('i32', '%9d', 'stol'),
+    'u32': ('u32', '%08X', 'stoul_0x'),
+    'i64': ('i64', '%20ld', 'stol'),
+    'li64': ('i64', '%20lld', 'stol'),
+    'u64': ('u64', '%016lX', 'stoul_0x'),
+    'lu64': ('u64', '%016llX', 'stoul_0x'),
+    'f32': ('f32', '%14.4e', 'stod'),
+    'f64': ('f64', '%14.4e', 'stod') ,
+}
 ctype_fmts:dict[str, tuple[str,str,str]] = {
     'bool':('u8', '%1X', 'stoul_0x'),
-    'int8_t':('i8', '%3d', 'stol'),
-    'char':('i8', '%3d', 'stol'),
-    'signed char':('i8', '%3d', 'stol'),
-    'uint8_t': ('u8', '%02X', 'stoul_0x'),
-    'unsigned char': ('u8', '%02X', 'stoul_0x'),
-    'int16_t':('i16', '%5d', 'stol'),
-    'short': ('i16', '%5d', 'stol'),
-    'short int': ('i16', '%5d', 'stol'),
-    'signed short': ('i16', '%5d', 'stol'),
-    'signed short int': ('i16', '%5d', 'stol'),
-    'uint16_t':('u16', '%04X', 'stoul_0x'),
-    'unsigned short': ('u16', '%04X', 'stoul_0x'),
-    'unsigned short int': ('u16', '%04X', 'stoul_0x'),
-    'int32_t': ('i32', '%9d', 'stol'),
-    'int': ('i32', '%9d', 'stol'),
-    'signed': ('i32', '%9d', 'stol'),
-    'signed int': ('i32', '%9d', 'stol'),
-    'uint32_t': ('u32', '%08X', 'stoul_0x'),
-    'unsigned int': ('u32', '%08X', 'stoul_0x'),
-    'int64_t': ('i64', '%20lld', 'stol'),
-    'long': ('i64', '%20ld', 'stol'),
-    'long int': ('i64', '%20ld', 'stol'),
-    'signed long': ('i64', '%20ld', 'stol'),
-    'signed long int': ('i64', '%20ld', 'stol'),
-    'long long': ('i64', '%20lld', 'stol'),
-    'long long int': ('i64', '%20lld', 'stol'),
-    'signed long long': ('i64', '%20lld', 'stol'),
-    'signed long long int': ('i64', '%20lld', 'stol'),
-    'uint64_t': ('u64', '%016llX', 'stoul_0x'),
-    'unsigned long': ('u64', '%016llX', 'stoul_0x'),
-    'unsigned long int': ('u64', '%016llX', 'stoul_0x'),
-    'unsigned long long': ('u64', '%016llX', 'stoul_0x'),
-    'unsigned long long int': ('u64', '%016llX', 'stoul_0x'),
-    'float': ('f32', '%14.4e', 'stod'),
-    'double': ('f64','%14.4e', 'stod') ,
+    'int8_t': cli_types['i8'],
+    'char': cli_types['i8'],
+    'signed char': cli_types['i8'],
+    'uint8_t': cli_types['u8'],
+    'unsigned char': cli_types['u8'],
+    'int16_t': cli_types['i16'],
+    'short': cli_types['i16'],
+    'short int': cli_types['i16'],
+    'signed short': cli_types['i16'],
+    'signed short int': cli_types['i16'],
+    'uint16_t': cli_types['u16'],
+    'unsigned short': cli_types['u16'],
+    'unsigned short int': cli_types['u16'],
+    'int32_t': cli_types['i32'],
+    'int': cli_types['i32'],
+    'signed': cli_types['i32'],
+    'signed int': cli_types['i32'],
+    'uint32_t': cli_types['u32'],
+    'unsigned int': cli_types['u32'],
+    'int64_t': cli_types['i64'],
+    'long': cli_types['i64'],
+    'long int': cli_types['i64'],
+    'signed long': cli_types['i64'],
+    'signed long int': cli_types['i64'],
+    'long long': cli_types['li64'],
+    'long long int': cli_types['li64'],
+    'signed long long': cli_types['li64'],
+    'signed long long int': cli_types['li64'],
+    'uint64_t': cli_types['u64'],
+    'unsigned long': cli_types['u64'],
+    'unsigned long int': cli_types['u64'],
+    'unsigned long long': cli_types['lu64'],
+    'unsigned long long int': cli_types['lu64'],
+    'float': cli_types['f32'],
+    'double': cli_types['f64'],
 }
 
 
@@ -152,7 +166,7 @@ class CBitfield:
             
 class ObjectFrame:
     @staticmethod
-    def get_frame(text:str) -> tuple[str, str, str, str, str]:
+    def get_frame(text:str) -> tuple[str, str, str, str]:
         # frame, remainder, type (struct, union), typename, varname
         # return the first full brace enclosure and the remainder of the text
         # are there more than just structs and unions?
@@ -165,7 +179,7 @@ class ObjectFrame:
         first_union:int = pos_end(text.find('union'))
 
         if first_struct == END and first_union == END:
-            return '', text, '', '', ''
+            return '', text, '', ''
 
         text = text[min(first_struct, first_union):]
 
@@ -175,7 +189,7 @@ class ObjectFrame:
         first_open:int = pos_end(text.find("{"))
 
         if first_semi < first_open:
-            return '__skipped__', text[first_semi+1:], '', '', ''
+            return '__skipped__', text[first_semi+1:], '', ''
 
         for i, c in enumerate(text):
             # wait for the start of the first
@@ -201,18 +215,16 @@ class ObjectFrame:
                 if typename == '{':
                     typename = '_'+s_or_u
                     
-                var_name = frame[frame.rfind('}')+1 : frame.rfind(';')].strip()
-                
-                return frame, remainder, s_or_u, typename, var_name
+                return frame, remainder, s_or_u, typename
 
         raise ValueError(f'Invalid syntax: failed to find brace enclosure:', text)
 
-    def __init__(self, body_def:str, instance_name:str, parents:list) -> None:
+    def __init__(self, body_def:str, parents:list) -> None:
 
         self.parents:list[ObjectFrame] = parents
         self.raw_full:str = body_def.strip()
         self.frame_type:str = body_def.split(' ')[0]
-        self.instance_name:str = instance_name
+        self.instance_name:str = body_def[body_def.rfind('}')+1 : body_def.rfind(';')].strip()
 
         self.typename:str = body_def.split(' ')[1]
         if self.typename == '{':
@@ -228,8 +240,7 @@ class ObjectFrame:
         self.vars:list[CStdVar] = []
 
         self._get_frames()
-        self._get_bitfields()
-        self._get_std_vars()
+        self._get_vars()
 
 
         combo_types:list[str] = [ p.typename for p in self.parents]
@@ -238,9 +249,10 @@ class ObjectFrame:
         self.combo_type:str = '::'.join(combo_types + [self.typename])
         self.combo_name:str = '.'.join(combo_names + [self.instance_name])
 
+        self.print()
 
-        self.macros:list[str] = []
 
+    def print(self) -> None:
         for b in self.bitfields:
             for name, width in b.fields:
                 print(f"{{bitfield}} {self.combo_type} {self.combo_name}: {b.ctype} {name}:{width};")
@@ -281,29 +293,12 @@ class ObjectFrame:
 
         return macros
 
-    def if_print_statements(self, base_name:str) -> list[str]:
-        if_checks:list[str] = []
-
-        for frame in self.structs + self.unions:
-            if_checks += frame.if_print_statements(base_name)
-
-        if len(self.combo_name) > 0:
-            self.combo_name += '.'
-
-        for v in self.vars:
-            if_checks += [f'if (structname == "{base_name}" && varname == "{self.combo_name}{v.name}") {{}}']
-
-        for b in self.bitfields:
-            for f, _ in b.fields:
-                if_checks += [f'if (structname == "{base_name}" && varname == "{self.combo_name}{f}") {{}}']
-                
-        return if_checks
 
     def _get_frames(self) -> None:
         remainder = self.raw_body
 
         while True:
-            frame, remainder, s_or_u, _, instance_name = ObjectFrame.get_frame(remainder)
+            frame, remainder, s_or_u, _= ObjectFrame.get_frame(remainder)
             
             if frame == '__skipped__':
                 continue
@@ -312,111 +307,83 @@ class ObjectFrame:
                 return
 
             if s_or_u == 'struct':
-                self.structs.append(CStruct(frame, instance_name, self.parents + [self]))
+                self.structs.append(CStruct(frame, self.parents + [self]))
 
             elif s_or_u == 'union':
-                self.unions.append(CUnion(frame, instance_name, self.parents + [self]))
+                self.unions.append(CUnion(frame, self.parents + [self]))
 
             else:
                 raise ValueError(f"Invalid frame type: {s_or_u}")
 
-
-    def _get_bitfields(self) -> None:
+    def _get_vars(self) -> None:
         only_members = self.raw_body
 
-        for u in self.unions:
-            only_members = only_members.replace(u.raw_full, '')
-
-        for s in self.structs:
-            only_members = only_members.replace(s.raw_full, '')
+        for f in self.unions + self.structs:
+            only_members = only_members.replace(f.raw_full, '')
 
         for member in only_members.split(';'):
             if ':' in member and not '::' in member:
                 self.bitfields.append(CBitfield(member))
-
-    def _get_std_vars(self) -> None:
-        only_members = self.raw_body
-
-        for s in self.structs:
-            only_members = only_members.replace(s.raw_full, '')
-
-        for u in self.unions:
-            only_members = only_members.replace(u.raw_full, '')
-
-        for b in self.bitfields:
-            only_members = only_members.replace(b.raw, '')
-
-        for member in only_members.split(';'):
-            if len(member.strip()) != 0:
+            elif len(member.strip()) != 0:
                 self.vars.append(CStdVar(member))
 
 
 
 class CStruct(ObjectFrame):
-    def __init__(self, struct_def:str, instance_name:str, parents:list[ObjectFrame] = []) -> None:
-        super().__init__(struct_def, instance_name, parents)
+    def __init__(self, struct_def:str, parents:list[ObjectFrame] = []) -> None:
+        super().__init__(struct_def, parents)
 
 
 class CUnion(ObjectFrame):
-    def __init__(self, union_def:str, instance_name:str, parents:list[ObjectFrame] = []) -> None:
-        super().__init__(union_def, instance_name, parents)
+    def __init__(self, union_def:str, parents:list[ObjectFrame] = []) -> None:
+        super().__init__(union_def, parents)
     
 
 
 
-def find_registrations(filenames:list[str]) -> list[tuple[str, str]]:
+#
+# Go through the file and find all empty macro calls
+# that indicate to this program which structs we need to handle
+#
+def find_registrations(text:str) -> list[tuple[str, str]]:
     registers:list[tuple[str, str]] = []
 
-    for filename in filenames:
-        if 'structs.h' in filename:
-            continue
+    text = text.replace('#define REGISTER_STRUCT', '')
+    while text.find('REGISTER_STRUCT') != -1:
 
-        with open(filename, 'r') as f:
-            text = f.read()
+        text = text[text.find('REGISTER_STRUCT'):]
 
-        text = text.replace('#define REGISTER_STRUCT', '')
-        while text.find('REGISTER_STRUCT') != -1:
+        name_reg = text[text.find("(")+1 : text.find(")")]
 
-            text = text[text.find('REGISTER_STRUCT'):]
+        if ';' in name_reg or '{' in name_reg or '}' in name_reg or name_reg.count(',') != 1:
+            ValueError("Invalid struct registration")
 
-            name_reg = text[text.find("(")+1 : text.find(")")]
+        struct, name = (s.strip() for s in name_reg.split(',')) 
 
-            if ';' in name_reg or '{' in name_reg or '}' in name_reg or name_reg.count(',') != 1:
-                ValueError("Invalid struct registration")
+        if len(struct) == 0 or len(name) == 0:
+            ValueError("Invalid struct registration")
 
-            struct, name = (s.strip() for s in name_reg.split(',')) 
-
-            if len(struct) == 0 or len(name) == 0:
-                ValueError("Invalid struct registration")
-
-            registers.append((struct, name))
-            text = text[1:] # shit
+        registers.append((struct, name))
+        text = text[1:] # shit
 
     return registers
 
 
 # todo: chase out provided include paths
-def find_bases(filenames:list[str]) -> list[CStruct]:
+def find_struct_defs(text:str) -> dict[str, CStruct]:
 
     sdefs:list[CStruct] = [] 
-    for filename in filenames:
-        if 'structs.h' in filename:
-            continue
-
-        with open(filename, "r") as f:
-            raw = f.read()
-            
-        text = '\n'.join([line for line in raw.split('\n') if len(line) > 0 and line[0] != '#'])
-        text = deformat_source(text)
         
-        while text.find('struct') != -1:
-            sdef, text, _, _, _ = ObjectFrame.get_frame(text)
-            if sdef == '__skipped__':
-                continue
-            sdefs.append(CStruct(sdef, ''))
+    text = '\n'.join([line for line in text.split('\n') if len(line) > 0 and line[0] != '#'])
+    text = deformat_source(text)
+    
+    while text.find('struct') != -1:
+        sdef, text, s_or_u, _ = ObjectFrame.get_frame(text)
+        if s_or_u != 'struct':
+            continue
+        sdefs.append(CStruct(sdef))
      
-    return sdefs
-
+    return { s.typename:s for s in sdefs }
 
 def main() -> None:
     source_files:list[str] = glob.glob('./*.h') + glob.glob('./*.cpp')
@@ -424,17 +391,22 @@ def main() -> None:
     source_files.remove('./structs.cpp')
     source_files.remove('./structs.h')
 
-    defined_structs:dict[str, CStruct] = { s.typename:s for s in find_bases(source_files) }
+    defined_structs:dict[str, CStruct] = {}
+    registered_names:list[tuple[str, str]] = []
 
-    with open('structs.cpp') as f:
-        struct_cpp:str = f.read()
+    for filename in source_files:
 
-    struct_cpp = re.sub(r'//\s*pycstruct_shit.*', '//pycstruct_shit\n', struct_cpp, flags=re.DOTALL)
+        with open(filename, "r") as f:
+            text = f.read()
+
+        registered_names += find_registrations(text)
+        defined_structs.update(find_struct_defs(text))
+
 
     registers:str = ''
     static_instances:str = ''
 
-    for struct_type, struct_name in find_registrations(source_files):
+    for struct_type, struct_name in registered_names:
         if struct_type not in defined_structs:
             ValueError("Registered a struct that doesn't have a definition")
 
@@ -447,10 +419,15 @@ def main() -> None:
     instance_def = f'{static_instances}\n\n'
     init_def = f'void init_structs()\n{{\n{registers}\n}}\n\n'
 
+    with open('structs.cpp') as f:
+        struct_cpp:str = f.read()
+
+    struct_cpp = re.sub(r'//\s*pycstruct_shit.*', r'//pycstruct_shit\n', struct_cpp, flags=re.DOTALL)
     struct_cpp += instance_def + init_def
 
     with open('structs.cpp', 'w') as f:
         f.write(struct_cpp)
+
 
 
 

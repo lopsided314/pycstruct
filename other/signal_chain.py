@@ -1,22 +1,28 @@
-import re
 import numpy as np
-from typing import Sequence, Self
-import json
+from typing import Sequence
+
+from catalog_filter import PartFilter, load_catalog
 
 T0 = 290 # K
 k = 1.380649e-23 # Boltzmann
+
+def dB(x):
+    return 10*np.log10(x)
+
+def undB(x):
+    return 10**(x/10)
 
 def Te(F:float) -> float:
     return T0*(F-1)
 
 def mismatch_loss_dB(VSWR:float) -> float:
     refl_coeff = (VSWR-1)/(VSWR+1)
-    return 10*np.log10(1 - refl_coeff**2)
+    return dB(1 - refl_coeff**2)
 
 class Component:
     def __init__(self, gain_dB:float, NF_dB:float, VSWR:float, Pin_limit_dBm:float, desc:str) -> None:
-        self.G:float = 10**(gain_dB/10)
-        self.F:float = 10**(NF_dB/10)
+        self.G:float = undB(gain_dB)
+        self.F:float = undB(NF_dB)
         self.VSWR:float = VSWR
         self.Pin_limit_dBm:float = Pin_limit_dBm
         self.desc:str = desc
@@ -24,10 +30,10 @@ class Component:
         self.Pout_dBm:float = -999 
 
     def set_Pin(self, Pin_dBm:float) -> None:
-        self.Pout_dBm:float = Pin_dBm + 10*np.log10(self.G)
+        self.Pout_dBm:float = Pin_dBm + dB(self.G)
         if Pin_dBm > self.Pin_limit_dBm:
             if self.G > 1:
-                print(f'"{self.desc}" output too high: {self.Pout_dBm:.1f}, P1dB = {self.Pin_limit_dBm+10*np.log10(self.G):.1f}')
+                print(f'"{self.desc}" output too high: {self.Pout_dBm:.1f}, P1dB = {self.Pin_limit_dBm+dB(self.G):.1f}')
             else:
                 print(f'"{self.desc}" input too high: {Pin_dBm:.1f}, {self.Pin_limit_dBm:.1f}')
             self.in_comp = True
@@ -113,16 +119,16 @@ class Stage:
 
     def __str__(self) -> str:
         ret:str = f'Stage "{self.desc}":\n'
-        ret += f'  G    = {self.G:5.2f}, {10*np.log10(self.G):6.2f} dB\n'
-        ret += f'  F    = {self.F:5.2f}, {10*np.log10(self.F):6.2f} dB\n'
+        ret += f'  G    = {self.G:5.2f}, {dB(self.G):6.2f} dB\n'
+        ret += f'  F    = {self.F:5.2f}, {dB(self.F):6.2f} dB\n'
         ret += f'  Pout = {self.Pout_dBm:5.2f} dBm\n'
         if self.in_comp:
             ret += f'  Has component power issue\n'
 
         return ret
 
-
-def analyze_stages(stages:Sequence[Stage], Pin_dBm:float) -> None:
+import copy
+def analyze_stages(stages:Sequence[Stage], Pin_dBm:float, BW_MHz:float, **kwargs) -> None:
     stages[0].set_Pin(Pin_dBm=Pin_dBm)
     for prev, next in zip(stages[:-1], stages[1:]):
         next.set_Pin(prev.Pout_dBm)
@@ -140,99 +146,37 @@ def analyze_stages(stages:Sequence[Stage], Pin_dBm:float) -> None:
     Gtot, Ftot = cascade_G_F(components)
     Teff = Te(Ftot)
 
-    No_norm = k*Teff
-
     print(f'Totals:')
-    print(f'  G    = {Gtot:6.1f} / {10*np.log10(Gtot):6.2f} dB')
-    print(f'  F    = {Ftot:6.1f} / {10*np.log10(Ftot):6.2f} dB')
+    print(f'  G    = {Gtot:6.1f} / {dB(Gtot):6.2f} dB')
+    print(f'  F    = {Ftot:6.1f} / {dB(Ftot):6.2f} dB')
     print(f'  Teff = {Teff:6.0f} K')
     print(f'  Pout = {Pout_dBm:6.2f} dBm')
-    print(f'  No   = {10*np.log10(No_norm) + 30:6.1f} dBm/Hz')
-
-
-class PartFilter:
-    # needs to already be narrowed down to the component list level
-    def __init__(self, catalog:dict):
-        self._catalog = catalog
-        self._name_re = '.*'
-        self._freq = ((0, 100), (0, 100))
-        self._gain = (-999, 999)
-        self._VSWR = 999
-        self._Pin = -999
-        self._NF = (0, 999)
-
-    def _update_catalog(self) -> None:
-        catalog:dict = {}
-        for name, spec in self._catalog.items():
-
-            name_ok:bool = re.fullmatch(self._name_re, name) is not None
-
-            freq_ok:bool = True
-            if 'Freq Start GHz' in spec:
-                freq_ok &= self._freq[0][0] <= spec['Freq Start GHz'] and self._freq[0][1] >= spec['Freq Start GHz']
-            if 'Freq Stop GHz' in spec:
-                freq_ok &= self._freq[1][0] <= spec['Freq Stop GHz'] and self._freq[1][1] >= spec['Freq Stop GHz']
-
-            gain_ok:bool = True
-            if 'Gain dB' in spec:
-                gain_ok = (self._gain[0] <= spec['Gain dB'] and self._gain[1] >= spec['Gain dB'])
-            elif 'IL dB'in spec:
-                gain_ok = self._gain[0] >= spec['IL dB']
-
-            VSWR_ok:bool = True
-            if 'VSWR' in spec:
-                VSWR_ok = self._VSWR >= spec['VSWR']
-
-            Pin_ok:bool = True
-            if 'P1 dB' in spec:
-                Pin_ok = self._Pin <= spec['P1 dB']
-            elif 'Pin Max dBm' in spec:
-                Pin_ok = self._Pin <= spec['Pin Max dBm']
-
-            # print(name_ok, freq_ok, gain_ok, VSWR_ok, Pin_ok
-            if name_ok and freq_ok and gain_ok and VSWR_ok and Pin_ok:
-                catalog[name] = spec
-
-        self._catalog = catalog
-
-    def name_re(self, name_match:str) -> Self:
-        self._name_re = '.*'+name_match+'.*'
-        self._name_re = self._name_re.replace('.*.*', '.*')
-        self._update_catalog()
-        return self
-
-    def freq(self, low:tuple[float, float], high:tuple[float, float]) -> Self:
-        self._freq = (low, high)
-        self._update_catalog()
-        return self
-
-    def gain(self, lim:tuple[float, float]) -> Self:
-        self._gain = lim
-        self._update_catalog()
-        return self
-
-    def insertion_loss(self, max:float) -> Self:
-        self._gain = (-max, 999)
-        self._update_catalog()
-        return self
-
-    def VSWR(self, lim:float) -> Self:
-        self._VSWR = lim
-        self._update_catalog()
-        return self
+    print(f'  No+  = {dB(k*Teff) + 30:6.1f} dBm/Hz ({dB(k*Teff*BW_MHz*1e6) + 30:6.1f} dBm/{BW_MHz:.0f} MHz)')
+    print()
     
-    def Pin(self, lim:float) -> Self:
-        self._Pin = lim
-        self._update_catalog()
-        return self
-    
-    def __str__(self) -> str:
-        return json.dumps(self._catalog, indent=4)
+    Tin:float = -1
+    if 'Tin' in kwargs:
+        Tin = float(kwargs['Tin'])
+    elif 'Ni_dBm' in kwargs:
+        Tin = 10**(float(kwargs['Ni_dBm']-30)/10) / (k*BW_MHz*1e6)
+    elif 'Ni_dBm_Hz' in kwargs:
+        Tin = 10**(float(kwargs['Ni_dBm_Hz']-30)/10)/k
+    elif 'SNR_in' in kwargs:
+        Ni_dBm = Pin_dBm - float(kwargs['SNR_in'])
+        Tin = 10**((Ni_dBm-30)/10) / (k*BW_MHz*1e6)
 
+    if Tin > 0:
+        To = Teff + Gtot*Tin
+        print(f'  Tin  = {Tin:10.0f} K')
+        print(f'  Ni   = {dB(k*Tin) + 30:6.2f} dBm/Hz ({dB(k*Tin*BW_MHz*1e6) + 30:6.1f} dBm/{BW_MHz:.0f} MHz)')
+        print(f'  No   = {dB(k*To) + 30:6.2f} dBm/Hz ({dB(k*To*BW_MHz*1e6) + 30:6.1f} dBm/{BW_MHz:.0f} MHz)')
+        print(f'  SNR  = {Pout_dBm - (dB(k*To*BW_MHz*1e6) + 30):.0f} dB/{BW_MHz:.0f} MHz')
 
-def load_catalog() -> tuple[dict, dict[str, Component]]:
-    with open("rf_catalog.json", "r") as f:
-        catalog = json.load(f)
+#--------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------
+
+def catalog_components() -> tuple[dict, dict[str, Component]]:
+    catalog = load_catalog()
 
     components:dict[str, Component] = {}
     for name, spec in catalog.get('Amplifiers', {}).items():
@@ -267,11 +211,7 @@ def load_catalog() -> tuple[dict, dict[str, Component]]:
     return catalog, components
 
 def test() -> None:
-    catalog, parts = load_catalog()
-
-    print(PartFilter(catalog['Amplifiers']).freq((7, 9), (10, 100)).gain((20,30)).VSWR(1.5).Pin(10).name_re('812'))
-    return
-
+    catalog, parts = catalog_components()
 
     LNA = parts['CA812-281B']
     ATTN1 = Loss(3.4, 1.8, 30)
@@ -280,7 +220,8 @@ def test() -> None:
         (PAD[3], LNA, ATTN1),
         desc='test'
     )
-    analyze_stages((stage, stage), 0)
+    stage2 = copy.deepcopy(stage)
+    analyze_stages((stage, stage2), 0, 10, SNR_in = 50)
 
 
 
