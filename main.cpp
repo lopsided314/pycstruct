@@ -1,4 +1,4 @@
-#include "structs.h"
+#include "structs.hpp"
 
 #include <iostream>
 #include <stdio.h>
@@ -12,10 +12,13 @@ struct Test {
     float f;
 };
 
+namespace Main {
+
 struct Test2 {
     const char *str;
     double dd;
 };
+} // namespace Main
 
 REGISTER_STRUCT(Test, test);
 REGISTER_STRUCT(Test2, test2);
@@ -35,18 +38,8 @@ namespace js = JStrings;
 int main() {
     init_structs();
 
-    std::vector<JStringList> arg_sets = {{"co", "test->d[0]", "-14"},
-                                         {"ci", "test->a"},
-                                         {"ci", "test->d[0,2]"},
-                                         {"co", "test->c", "0xabcd"},
-                                         {"ci", "test->c"},
-                                         {"ci", "test->d"},
-                                         {"co", "test->d[1:4]", "3.3.4e-5", "12", "13"},
-                                         {"ci", "test->d"},
-                                         {"mv", "test->", "8"},
-                                         {"co", "test->a", "-1"},
-                                         {"mv", "test->", "0"},
-                                         {"ci", "test->"}};
+    std::vector<JStringList> arg_sets = {{"co", "test->d", "2", "3", "4", "5", "-"},
+                                         {"ci", "test->d"}};
 
     for (const JStringList &args : arg_sets) {
 
@@ -63,7 +56,6 @@ int main() {
             cmd.s->print(args);
             break;
 
-
         case WRITE:
             write(cmd.data, cmd.size, cmd.offset);
             break;
@@ -78,7 +70,7 @@ int main() {
             return 0;
 
         case PASS:
-                std::cout << js::join(args, " ");
+            std::cout << js::join(args, " ");
         default:
             break;
         }

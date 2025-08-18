@@ -1,4 +1,5 @@
-#include "structs.h"
+#include "structs.hpp"
+#include "utils/jstrings/jstrings.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -17,7 +18,6 @@ std::map<std::string, Struct> g_structs;
     g_structs[#sname].name = #sname;                                                               \
     g_structs[#sname].type = #structtype;                                                          \
     g_structs[#sname].print = [](const JStringList &args) {                                        \
-        (void)args;                                                                                \
         for (const auto &var : g_structs[#sname].vars) {                                           \
             var.second.print(args);                                                                \
         }                                                                                          \
@@ -34,10 +34,8 @@ std::map<std::string, Struct> g_structs;
     g_structs[#sname].vars[#vname].offset = (size_t)&sname.vname - (size_t)&sname;                 \
     g_structs[#sname].vars[#vname].name = #vname;                                                  \
     g_structs[#sname].vars[#vname].set = [](const JStringList &args) {                             \
-        ctype val = js::stonum(args[2], &g_err);                                                   \
-        if (g_err.length() > 0)                                                                    \
-            std::cout << "Failed " << g_err << "\n";                                               \
-        else                                                                                       \
+        ctype val = cout_##stonum(args[2]);                                                        \
+        if (g_err.length() == 0)                                                                   \
             sname.vname = val;                                                                     \
     };                                                                                             \
     g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
@@ -55,10 +53,8 @@ std::map<std::string, Struct> g_structs;
     g_structs[#sname].vars[#vname].offset = 0;                                                     \
     g_structs[#sname].vars[#vname].name = #vname;                                                  \
     g_structs[#sname].vars[#vname].set = [](const JStringList &args) {                             \
-        ctype val = js::stonum(args[2], &g_err);                                                   \
-        if (g_err.length() > 0)                                                                    \
-            std::cout << "Failed " << g_err << "\n";                                               \
-        else                                                                                       \
+        ctype val = cout_##stonum(args[2]);                                                        \
+        if (g_err.length() == 0)                                                                   \
             sname.vname = val;                                                                     \
     };                                                                                             \
     g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
@@ -76,61 +72,54 @@ std::map<std::string, Struct> g_structs;
     g_structs[#sname].vars[#vname].offset = (size_t)&sname.vname[0] - (size_t)&sname;              \
     g_structs[#sname].vars[#vname].name = #vname;                                                  \
     g_structs[#sname].vars[#vname].set = [](const JStringList &args) {                             \
-        std::vector<int> indices = get_array_indices(args[1], length);                             \
-        for (size_t i = 0; i < indices.size() && i < args.size(); i++) {                           \
-            ctype val = js::stonum(args[i + 2], &g_err);                                           \
-            if (g_err.size() > 0) {                                                                \
-                std::cout << "Failed " << g_err << "\n";                                           \
-                return;                                                                            \
-            } else {                                                                               \
+        std::vector<int> indices = get_array_slice_indices(args[1], length);                       \
+        for (size_t i = 0; i < indices.size() && i < args.size() - 2; i++) {                       \
+            ctype val = cout_##stonum(args[i + 2]);                                                \
+            if (g_err.size() == 0)                                                                 \
                 sname.vname[indices[i]] = val;                                                     \
-            }                                                                                      \
+            else                                                                                   \
+                return;                                                                            \
         }                                                                                          \
     };                                                                                             \
     g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
-        auto indices = get_array_indices(args[1], length);                                         \
+        auto indices = get_array_slice_indices(args[1], length);                                   \
         for (int i : indices) {                                                                    \
             printf(#sname "->" #vname "[%3d] = " printf_fmt "\n", i, sname.vname[i]);              \
         }                                                                                          \
     };
 
-StructFind get_struct(std::string svname) {
+/*================================================================================*/
 
-    StructFind ret{};
-    auto sv_name_split = js::split(svname, "->", js::TrimAll);
-
-    if (sv_name_split.size() != 2) {
-        std::cout << "Invalid struct name\n";
-        return ret;
+static unsigned long cout_stoul_0x(std::string str) {
+    unsigned long val = js::stoul_0x(str, &g_err);
+    if (g_err.length() > 0) {
+        std::cout << "Failed " << g_err << "\n";
     }
-
-    std::string sname = sv_name_split[0];
-    std::string vname = sv_name_split[1];
-
-    if (js::contains_all(vname, "[]")) {
-        js::slice(&vname, 0, vname.find('['));
+    return val;
+}
+static long cout_stol(std::string str) {
+    long val = js::stol(str, &g_err);
+    if (g_err.length() > 0) {
+        std::cout << "Failed " << g_err << "\n";
     }
-    if (g_structs.count(sname)) {
-        ret.s = &g_structs[sname];
-        if (g_structs[sname].vars.count(vname)) {
-            ret.v = &g_structs[sname].vars[vname];
-        }
-    } else {
-        std::cout << "struct " << sname << "->" << vname << " not found'\n";
+    return val;
+}
+static double cout_stod(std::string str) {
+    double val = js::stod(str, &g_err);
+    if (g_err.length() > 0) {
+        std::cout << "Failed " << g_err << "\n";
     }
-    return ret;
+    return val;
 }
 
-std::vector<int> get_array_indices(std::string vname, int index_limit) {
+/*================================================================================*/
+
+static std::vector<int> get_array_slice_indices(std::string vname, int index_limit) {
     std::vector<int> indices;
     std::string brace_contents = "";
 
     if (js::contains_all(vname, "[]")) {
         brace_contents = js::slice(vname, vname.find('[') + 1, vname.find(']'));
-        if (brace_contents.length() == 0) {
-            std::cout << "Invalid array indices\n";
-            return {};
-        }
     }
 
     if (brace_contents.length() == 0) {
@@ -155,6 +144,7 @@ std::vector<int> get_array_indices(std::string vname, int index_limit) {
         return i;
     };
 
+    // python style slicing
     if (js::contains(brace_contents, ":")) {
 
         auto brace_split = js::split(brace_contents, ":", js::TrimAll);
@@ -164,13 +154,11 @@ std::vector<int> get_array_indices(std::string vname, int index_limit) {
         }
 
         int start = index_stol(brace_split[0]);
-        if (start == INDEX_ERR)
+        int stop = index_stol(brace_split[1]);
+        if (start == INDEX_ERR || stop == INDEX_ERR)
             return {};
 
-        int stop = index_stol(brace_split[1]);
-        if (stop == INDEX_ERR)
-            return {};
-        else if (stop == 0)
+        if (stop == 0)
             stop = index_limit;
 
         for (int i = start; i < stop; i++) {
@@ -178,10 +166,9 @@ std::vector<int> get_array_indices(std::string vname, int index_limit) {
         }
 
     } else {
+        // csv
         auto brace_split = js::split(brace_contents, ",", js::TrimAll | js::SkipEmpty);
         for (const std::string &s : brace_split) {
-            if (s.length() == 0)
-                continue;
 
             int i = index_stol(s);
             if (i == index_limit) {
@@ -197,52 +184,36 @@ std::vector<int> get_array_indices(std::string vname, int index_limit) {
     return indices;
 }
 
-StructParseOutput parse_struct_addr_cmd(const StructFind &sv, const JStringList &args) {
+/*================================================================================*/
 
-    StructParseOutput ret{};
+StructFind get_struct(std::string svname) {
 
-    if (args.size() != 3 || sv.v) {
-        std::cout << "Invalid args for setting struct address\n";
+    StructFind ret{};
+    auto strs = js::split(svname, "->", js::TrimAll);
+
+    if (strs.size() != 2) {
+        std::cout << "Invalid struct name\n";
         return ret;
-    } else {
-        size_t new_addr = js::stoul_0x(args[2], &g_err);
-        if (g_err.length() > 0) {
-            std::cout << "set struct addr: " << g_err << "\n";
-        } else {
-            sv.s->working_addr = new_addr;
-            ret.op = PASS;
-            ret.s = sv.s;
-            ret.v = sv.v;
+    }
+
+    std::string sname = strs[0];
+    std::string vname = strs[1];
+
+    if (js::contains_all(vname, "[]")) {
+        js::slice(&vname, 0, vname.find('['));
+    }
+    if (g_structs.count(sname)) {
+        ret.s = &g_structs[sname];
+        if (g_structs[sname].vars.count(vname)) {
+            ret.v = &g_structs[sname].vars[vname];
         }
-        return ret;
-    }
-
-    return ret;
-}
-
-StructParseOutput parse_struct_read_cmd(const StructFind &sv, const JStringList &args) {
-    StructParseOutput ret{};
-
-    if (args.size() != 2) {
-        std::cout << "Invalid args for reading struct\n";
-        return ret;
-    }
-
-    ret.s = sv.s;
-    if (sv.v) {
-        ret.op = READ_VAR;
-        ret.v = sv.v;
-        ret.data = sv.v->data + sv.v->offset;
-        ret.size = sv.v->size;
-        ret.offset = sv.v->offset + sv.s->working_addr;
     } else {
-        ret.op = READ_STRUCT;
-        ret.data = sv.s->data;
-        ret.size = sv.s->size;
-        ret.offset = sv.s->working_addr;
+        std::cout << "struct " << svname << " not found'\n";
     }
     return ret;
 }
+
+/*================================================================================*/
 
 StructParseOutput parse_struct_write_cmd(const StructFind &sv, const JStringList &args) {
     StructParseOutput ret{};
@@ -271,6 +242,59 @@ StructParseOutput parse_struct_write_cmd(const StructFind &sv, const JStringList
     }
     return ret;
 }
+
+/*================================================================================*/
+
+StructParseOutput parse_struct_addr_cmd(const StructFind &sv, const JStringList &args) {
+
+    StructParseOutput ret{};
+
+    if (args.size() != 3 || sv.v) {
+        std::cout << "Invalid args for setting struct address\n";
+        return ret;
+    } else {
+        size_t new_addr = js::stoul_0x(args[2], &g_err);
+        if (g_err.length() > 0) {
+            std::cout << "set struct addr: " << g_err << "\n";
+        } else {
+            sv.s->working_addr = new_addr;
+            ret.op = PASS;
+            ret.s = sv.s;
+            ret.v = sv.v;
+        }
+        return ret;
+    }
+
+    return ret;
+}
+
+/*================================================================================*/
+
+StructParseOutput parse_struct_read_cmd(const StructFind &sv, const JStringList &args) {
+    StructParseOutput ret{};
+
+    if (args.size() != 2) {
+        std::cout << "Invalid args for reading struct\n";
+        return ret;
+    }
+
+    ret.s = sv.s;
+    if (sv.v) {
+        ret.op = READ_VAR;
+        ret.v = sv.v;
+        ret.data = sv.v->data + sv.v->offset;
+        ret.size = sv.v->size;
+        ret.offset = sv.v->offset + sv.s->working_addr;
+    } else {
+        ret.op = READ_STRUCT;
+        ret.data = sv.s->data;
+        ret.size = sv.s->size;
+        ret.offset = sv.s->working_addr;
+    }
+    return ret;
+}
+
+/*================================================================================*/
 
 StructParseOutput parse_struct_input(const JStringList &args) {
 
@@ -310,27 +334,32 @@ StructParseOutput parse_struct_input(const JStringList &args) {
     return {};
 }
 
+/*================================================================================*/
+
 /**
  * EVERYTHING IN THIS FILE AFTER THIS LINE WILL BE OVERWRITTEN
  */
 
-//pycstruct_shit
-static struct _Test { int a ; unsigned int b:10 , :6 , c:12 , :4 ; float d [ 4 ] ; float f ; } test;
-static struct _Test2 { const char * str ; double dd ; } test2;
+// pycstruct_shit
+static struct _Test2 {
+    const char *str;
+    double dd;
+} test2;
+static struct _Test {
+    int a;
+    unsigned int b : 10, : 6, c : 12, : 4;
+    float d[4];
+    float f;
+} test;
 
+void init_structs() {
+    REGISTER_INTERNAL_STRUCT(_Test2, test2);
+    REGISTER_VAR(test2, dd, double, "%14.4e", stod);
 
-void init_structs()
-{
     REGISTER_INTERNAL_STRUCT(_Test, test);
     REGISTER_VAR(test, a, int, "%9d", stol);
     REGISTER_ARR(test, d, 4, float, "%14.4e", stod);
     REGISTER_VAR(test, f, float, "%14.4e", stod);
     REGISTER_BITFIELD(test, b, unsigned int, "%8X", stoul_0x);
     REGISTER_BITFIELD(test, c, unsigned int, "%8X", stoul_0x);
-    
-    REGISTER_INTERNAL_STRUCT(_Test2, test2);
-    REGISTER_VAR(test2, dd, double, "%14.4e", stod);
-    
-
 }
-

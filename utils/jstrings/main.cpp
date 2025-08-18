@@ -1,20 +1,16 @@
 #include "jstrings.hpp"
 #include <iostream>
 
-using JStrings::JStringList;
 namespace js = JStrings;
 
 #define TEST(a, b)                                                                                 \
-    do                                                                                             \
-    {                                                                                              \
-        if(a != b)                                                                                 \
-        {                                                                                          \
+    do {                                                                                           \
+        if (a != b) {                                                                              \
             std::cout << "Failed " #a " got:" << a << "\n";                                        \
         }                                                                                          \
-    } while(0);
+    } while (0);
 
-int main()
-{
+int main() {
     std::string ex = "Example Text";
 
     TEST(js::lower(ex), "example text");
@@ -24,6 +20,7 @@ int main()
     TEST(js::left_pad(ex, 14, '-'), "--Example Text");
     TEST(js::right_pad(ex, 4), "Example Text");
     TEST(js::right_pad(ex, 14, '-'), "Example Text--");
+    TEST(js::center_pad(ex, 17, '-'), "---Example Text--");
 
     TEST(js::slice(ex, 1, 4), "xam");
     TEST(js::slice(ex, 2, -2), "ample Te");
@@ -49,7 +46,5 @@ int main()
     std::string split_test = "ex ex  ex ";
     auto split_ret = js::split(split_test, "x", JStrings::TrimAll);
 
-
-    std::cout << js::contains_all(ex, "xlEt") << "\n";
+    std::cout << js::contains_all(ex, "exlEt") << "\n";
 }
-

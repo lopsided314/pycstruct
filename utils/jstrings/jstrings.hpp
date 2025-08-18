@@ -153,7 +153,24 @@ inline std::string right_pad(std::string str, int new_size, char pad_char = ' ')
 
 /*===========================================================================*/
 
-// TODO: Center pad
+inline void center_pad(std::string *str, size_t new_size, char pad_char = ' ') {
+    assert(str != nullptr);
+
+    if (str->length() >= new_size)
+        return;
+
+    if (!isgraph(pad_char))
+        pad_char = ' ';
+
+    size_t pad_length = new_size - str->length();
+    size_t right_length = pad_length / 2;
+    size_t left_length = pad_length / 2 + pad_length % 2;
+    *str = std::string(left_length, pad_char) + *str + std::string(right_length, pad_char);
+}
+inline std::string center_pad(std::string str, int new_size, char pad_char = ' ') {
+    JStrings::center_pad(&str, new_size, pad_char);
+    return str;
+}
 
 /*===========================================================================*/
 
@@ -163,17 +180,27 @@ inline void strip(std::string *str, std::string char_set, StripBehavior sb = Bot
     assert(str != nullptr);
     if (sb & Left) {
 
-        str->erase(str->begin(), std::find_if(str->begin(), str->end(), [char_set](char c) {
-                       return char_set.find(c) == std::string::npos;
-                   }));
+        str->erase(
+            str->begin(), 
+            std::find_if(
+                str->begin(), 
+                str->end(), 
+                [char_set](char c) {
+                   return char_set.find(c) == std::string::npos;
+                })
+            );
     }
     if (sb & Right) {
 
         str->erase(
-            std::find_if(str->rbegin(), str->rend(),
-                         [char_set](char c) { return char_set.find(c) == std::string::npos; })
-                .base(),
-            str->end());
+            std::find_if(
+                str->rbegin(), 
+                str->rend(),
+                [char_set](char c) { 
+                    return char_set.find(c) == std::string::npos; 
+                }).base(),
+            str->end()
+        );
     }
 }
 inline std::string strip(std::string str, std::string char_set, StripBehavior sb = Both) {
@@ -193,7 +220,7 @@ inline std::string strip(std::string str, StripBehavior sb = Both) {
 /*===========================================================================*/
 
 const static int32_t end = INT32_MAX;
-inline void slice(std::string *str, int start, int stop) {
+inline void slice(std::string *str, int32_t start, int32_t stop) {
     assert(str != nullptr);
     const int32_t len = str->length();
 
@@ -340,6 +367,24 @@ inline JStringList split(std::string str, std::string key, int sb = None) {
 
 /*===========================================================================*/
 
+inline std::string repeat(std::string str, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        str += str;
+    }
+    return str;
+}
+
+inline JStringList repeat(JStringList strs, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        for (std::string str : strs) {
+            strs.push_back(str);
+        }
+    }
+    return strs;
+}
+
+/*===========================================================================*/
+
 inline std::string join(const JStringList &strs, std::string sep = "\n", std::string head = "",
                         std::string tail = "") {
     if (strs.size() == 0)
@@ -350,6 +395,19 @@ inline std::string join(const JStringList &strs, std::string sep = "\n", std::st
         ret += sep + head + strs.at(i) + tail;
     }
 
+    return ret;
+}
+
+/*===========================================================================*/
+
+inline JStringList combine_lists(const JStringList &list1, const JStringList &list2) {
+    JStringList ret;
+    for (const std::string &str : list1) {
+        ret.push_back(str);
+    }
+    for (const std::string &str : list2) {
+        ret.push_back(str);
+    }
     return ret;
 }
 
@@ -385,6 +443,8 @@ inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
     return val;
 }
 
+/*===========================================================================*/
+
 inline long stol(std::string str, std::string *err = nullptr) {
     if (err)
         *err = "stol(\"" + str + "\"): ";
@@ -414,6 +474,8 @@ inline long stol(std::string str, std::string *err = nullptr) {
         *err = "";
     return val;
 }
+
+/*===========================================================================*/
 
 inline double stod(std::string str, std::string *err = nullptr) {
 
