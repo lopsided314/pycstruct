@@ -341,12 +341,9 @@ StructParseOutput parse_struct_input(const JStringList &args) {
 
 //pycstruct_shit
 static struct _Test { int a ; unsigned int b:10 , :6 , c:12 , :4 ; float d [ 4 ] ; float f ; } test;
-<<<<<<< HEAD
-=======
 #pragma pack(push, 4)
 static struct _Name2 { int a ; int b:20 , :12 ; unsigned int c:12 , :20 ; float d [ 4 ] ; unsigned short e ; struct PLPL { uint32_t att:9 , :7 , phase:9 , :7 ; uint32_t val ; } plpl ; union U { int i ; float f ; uint32_t u ; } u1 ; } name;
 #pragma pack(pop)
->>>>>>> bda012c818bedcf42d8cb61d7399a1d6a191eac7
 static struct _Test2 { const char * str ; double dd ; } test2;
 
 
@@ -359,8 +356,6 @@ void init_structs()
     REGISTER_BITFIELD(test, b, unsigned int, "%8X", stoul_0x);
     REGISTER_BITFIELD(test, c, unsigned int, "%8X", stoul_0x);
 
-<<<<<<< HEAD
-=======
     REGISTER_INTERNAL_STRUCT(_Name2, name);
     REGISTER_VAR(name, plpl.val, uint32_t, "%08X", stoul_0x);
     REGISTER_BITFIELD(name, plpl.att, uint32_t, "%8X", stoul_0x);
@@ -374,7 +369,6 @@ void init_structs()
     REGISTER_BITFIELD(name, b, int, "%9d", stol);
     REGISTER_BITFIELD(name, c, unsigned int, "%8X", stoul_0x);
 
->>>>>>> bda012c818bedcf42d8cb61d7399a1d6a191eac7
     REGISTER_INTERNAL_STRUCT(_Test2, test2);
     REGISTER_VAR(test2, dd, double, "%14.4e", stod);
 }
