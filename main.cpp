@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include <vector>
-#pragma pack(0)
+
 struct Test {
     int a;
     unsigned int b : 10, : 6, c : 12, : 4;
@@ -20,10 +20,19 @@ struct Test2 {
 };
 } // namespace Main
 
-REGISTER_STRUCT(Test, test);
-REGISTER_STRUCT(Test2, test2);
+REGISTER_STRUCT(Test, test, -1);
+REGISTER_STRUCT(Test2, test2, -1);
+REGISTER_STRUCT(Name2, name, 4);
 
-uint8_t g_data[1024];
+
+volatile uint8_t g_data[1024];
+
+void print_buf() {
+    for (size_t i = 0; i < 20; i++) {
+        printf("%2lu, %8X\n", i*4, *(uint32_t*)&g_data[4*i]);
+    }
+}
+
 
 void write(uint8_t *data, size_t size, size_t offset) {
     // printf("  write: %p %lu\n", data, size);
@@ -36,10 +45,22 @@ void read(uint8_t *data, size_t size, size_t offset) {
 namespace js = JStrings;
 
 int main() {
+
     init_structs();
 
-    std::vector<JStringList> arg_sets = {{"co", "test->d", "2", "3", "4", "5", "-"},
-                                         {"ci", "test->d"}};
+    std::vector<JStringList> arg_sets = {
+        {"mv", "name->", "4"},
+        {"co", "name->plpl.att", "0xfff"},
+        {"co", "name->plpl.phase", "0xfff"},
+        {"mv", "name->", "0"},
+        {"co", "name->a", "-1"},
+        {"co", "name->d", "-1", "-.1", "-.01"},
+        {"co", "name->e", "0xbbbb"},
+        // {"co", "name->val", "0x111111"},
+        {"co", "name->b", "123445678"},
+        {"co", "name->c", "deadbeef"},
+        {"ci", "name->"},
+    };
 
     for (const JStringList &args : arg_sets) {
 
@@ -58,12 +79,14 @@ int main() {
 
         case WRITE:
             write(cmd.data, cmd.size, cmd.offset);
+            continue;
             break;
 
         case WRITE_BITFIELD:
             read(cmd.data, cmd.size, cmd.offset);
             cmd.v->set(args);
             write(cmd.data, cmd.size, cmd.offset);
+            continue;
             break;
 
         case ERROR:

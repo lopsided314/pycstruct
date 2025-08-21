@@ -1,6 +1,6 @@
 CXX=g++
 STD=-std=c++11
-FLAGS=-Wpedantic -Wextra -Wall -ggdb -fsanitize=address -O1 
+FLAGS=-Wpedantic -Wextra -Wall -ggdb -O1 
 INCLUDES=
 EXE=test
 PYTHON=python3 

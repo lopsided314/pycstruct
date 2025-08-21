@@ -324,8 +324,8 @@ def get_object_frame(text:str) -> tuple[str, str]:
 # Go through the file and find all empty macro calls
 # that indicate to this program which structs we need to handle
 #
-def find_registrations(text:str) -> set[tuple[str, str]]:
-    registers:set[tuple[str, str]] = set()
+def find_registrations(text:str) -> set[tuple[str, str, str]]:
+    registers:set[tuple[str, str, str]] = set()
 
     text = text.replace('#define REGISTER_STRUCT', '')
     while text.find('REGISTER_STRUCT') != -1:
@@ -334,15 +334,15 @@ def find_registrations(text:str) -> set[tuple[str, str]]:
 
         name_reg = text[text.find("(")+1 : text.find(")")]
 
-        if ';' in name_reg or '{' in name_reg or '}' in name_reg or name_reg.count(',') != 1:
+        if ';' in name_reg or '{' in name_reg or '}' in name_reg or name_reg.count(',') != 2:
             ValueError("Invalid struct registration")
 
-        struct, name = (s.strip() for s in name_reg.split(',')) 
+        struct, name, pragma_pack = (s.strip() for s in name_reg.split(',')) 
 
         if len(struct) == 0 or len(name) == 0:
             ValueError("Invalid struct registration")
 
-        registers.add((struct, name))
+        registers.add((struct, name, pragma_pack))
         text = text[1:] # shit
 
     return registers
@@ -402,7 +402,7 @@ def main(make_includes:set[str]) -> None:
     source_files = {os.path.realpath(file) for file in source_files if _valid_file(file)}
 
     defined_structs:dict[str, ObjectFrame] = {}
-    registered_structs:set[tuple[str, str]] = set()
+    registered_structs:set[tuple[str, str, str]] = set()
 
     for filename in source_files:
         with open(filename, "r") as f:
@@ -414,13 +414,17 @@ def main(make_includes:set[str]) -> None:
     static_instances:str = ''
     registers:str = ''
 
-    for registered_type, registered_name in registered_structs:
+    for registered_type, registered_name, pragma_pack in registered_structs:
         if registered_type not in defined_structs:
             ValueError("Registered a struct that doesn't have a definition")
 
         print(f'Pycstruct: Generating macros for: {registered_type} "{registered_name}"')
 
+        if pragma_pack != '-1':
+            static_instances += f'#pragma pack(push, {pragma_pack})\n'
         static_instances += f'static struct _{registered_type} {{{defined_structs[registered_type].raw_body}}} {registered_name};\n'
+        if pragma_pack != '-1':
+            static_instances += f'#pragma pack(pop)\n'
 
         registers += f'    REGISTER_INTERNAL_STRUCT(_{registered_type}, {registered_name});\n'
         registers += '    ' + '\n    '.join(defined_structs[registered_type].reg_macros(registered_name)) + '\n\n'

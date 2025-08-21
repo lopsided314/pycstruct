@@ -5,7 +5,7 @@
 #include <map>
 #include <string>
 
-#define REGISTER_STRUCT(a, b)
+#define REGISTER_STRUCT(a, b, pragma_pack)
 
 void init_structs();
 
@@ -35,7 +35,7 @@ struct StructFind {
     Struct *s = nullptr;
     Var *v = nullptr;
 };
-StructFind get_struct(std::string structname, std::string varname);
+StructFind get_struct(std::string svname);
 
 enum StructOperation { ERROR, READ_VAR, READ_STRUCT, WRITE, WRITE_BITFIELD, PASS };
 

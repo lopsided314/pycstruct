@@ -31,7 +31,7 @@ std::map<std::string, Struct> g_structs;
     g_structs[#sname].vars[#vname].data = (uint8_t *)&sname.vname;                                 \
     g_structs[#sname].vars[#vname].size = sizeof(sname.vname);                                     \
     g_structs[#sname].vars[#vname].sizeof_ctype = sizeof(sname.vname);                             \
-    g_structs[#sname].vars[#vname].offset = (size_t)&sname.vname - (size_t)&sname;                 \
+    g_structs[#sname].vars[#vname].offset = (size_t) & sname.vname - (size_t) & sname;             \
     g_structs[#sname].vars[#vname].name = #vname;                                                  \
     g_structs[#sname].vars[#vname].set = [](const JStringList &args) {                             \
         ctype val = cout_##stonum(args[2]);                                                        \
@@ -66,10 +66,10 @@ std::map<std::string, Struct> g_structs;
     assert(g_structs.count(#sname) && "Trying to register var with unregistered struct: " #sname); \
     g_structs[#sname].vars[#vname] = Var{};                                                        \
     g_structs[#sname].vars[#vname].type = VarType::Array;                                          \
-    g_structs[#sname].vars[#vname].data = (uint8_t *)&sname;                                       \
+    g_structs[#sname].vars[#vname].data = (uint8_t *)&sname.vname;                                 \
     g_structs[#sname].vars[#vname].size = sizeof(sname.vname);                                     \
     g_structs[#sname].vars[#vname].sizeof_ctype = sizeof(ctype);                                   \
-    g_structs[#sname].vars[#vname].offset = (size_t)&sname.vname[0] - (size_t)&sname;              \
+    g_structs[#sname].vars[#vname].offset = (size_t) & sname.vname[0] - (size_t) & sname;          \
     g_structs[#sname].vars[#vname].name = #vname;                                                  \
     g_structs[#sname].vars[#vname].set = [](const JStringList &args) {                             \
         std::vector<int> indices = get_array_slice_indices(args[1], length);                       \
@@ -206,9 +206,9 @@ StructFind get_struct(std::string svname) {
         ret.s = &g_structs[sname];
         if (g_structs[sname].vars.count(vname)) {
             ret.v = &g_structs[sname].vars[vname];
+        } else if (vname.length() > 0) {
+            ret.s = nullptr;
         }
-    } else {
-        std::cout << "struct " << svname << " not found'\n";
     }
     return ret;
 }
@@ -225,13 +225,12 @@ StructParseOutput parse_struct_write_cmd(const StructFind &sv, const JStringList
 
     ret.s = sv.s;
     ret.v = sv.v;
-    ret.data = sv.v->data + sv.v->offset;
+    ret.data = sv.v->data;
     ret.size = sv.v->size;
     ret.offset = sv.v->offset + sv.s->working_addr;
 
     switch (sv.v->type) {
     case Std:
-
     case Array:
         sv.v->set(args);
         ret.op = WRITE;
@@ -282,7 +281,7 @@ StructParseOutput parse_struct_read_cmd(const StructFind &sv, const JStringList 
     if (sv.v) {
         ret.op = READ_VAR;
         ret.v = sv.v;
-        ret.data = sv.v->data + sv.v->offset;
+        ret.data = sv.v->data;
         ret.size = sv.v->size;
         ret.offset = sv.v->offset + sv.s->working_addr;
     } else {
@@ -342,6 +341,12 @@ StructParseOutput parse_struct_input(const JStringList &args) {
 
 //pycstruct_shit
 static struct _Test { int a ; unsigned int b:10 , :6 , c:12 , :4 ; float d [ 4 ] ; float f ; } test;
+<<<<<<< HEAD
+=======
+#pragma pack(push, 4)
+static struct _Name2 { int a ; int b:20 , :12 ; unsigned int c:12 , :20 ; float d [ 4 ] ; unsigned short e ; struct PLPL { uint32_t att:9 , :7 , phase:9 , :7 ; uint32_t val ; } plpl ; union U { int i ; float f ; uint32_t u ; } u1 ; } name;
+#pragma pack(pop)
+>>>>>>> bda012c818bedcf42d8cb61d7399a1d6a191eac7
 static struct _Test2 { const char * str ; double dd ; } test2;
 
 
@@ -354,6 +359,22 @@ void init_structs()
     REGISTER_BITFIELD(test, b, unsigned int, "%8X", stoul_0x);
     REGISTER_BITFIELD(test, c, unsigned int, "%8X", stoul_0x);
 
+<<<<<<< HEAD
+=======
+    REGISTER_INTERNAL_STRUCT(_Name2, name);
+    REGISTER_VAR(name, plpl.val, uint32_t, "%08X", stoul_0x);
+    REGISTER_BITFIELD(name, plpl.att, uint32_t, "%8X", stoul_0x);
+    REGISTER_BITFIELD(name, plpl.phase, uint32_t, "%8X", stoul_0x);
+    REGISTER_VAR(name, u1.i, int, "%9d", stol);
+    REGISTER_VAR(name, u1.f, float, "%14.4e", stod);
+    REGISTER_VAR(name, u1.u, uint32_t, "%08X", stoul_0x);
+    REGISTER_VAR(name, a, int, "%9d", stol);
+    REGISTER_ARR(name, d, 4, float, "%14.4e", stod);
+    REGISTER_VAR(name, e, unsigned short, "%04X", stoul_0x);
+    REGISTER_BITFIELD(name, b, int, "%9d", stol);
+    REGISTER_BITFIELD(name, c, unsigned int, "%8X", stoul_0x);
+
+>>>>>>> bda012c818bedcf42d8cb61d7399a1d6a191eac7
     REGISTER_INTERNAL_STRUCT(_Test2, test2);
     REGISTER_VAR(test2, dd, double, "%14.4e", stod);
 }
