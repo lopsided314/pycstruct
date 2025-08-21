@@ -340,26 +340,21 @@ StructParseOutput parse_struct_input(const JStringList &args) {
  * EVERYTHING IN THIS FILE AFTER THIS LINE WILL BE OVERWRITTEN
  */
 
-// pycstruct_shit
-static struct _Test2 {
-    const char *str;
-    double dd;
-} test2;
-static struct _Test {
-    int a;
-    unsigned int b : 10, : 6, c : 12, : 4;
-    float d[4];
-    float f;
-} test;
+//pycstruct_shit
+static struct _Test { int a ; unsigned int b:10 , :6 , c:12 , :4 ; float d [ 4 ] ; float f ; } test;
+static struct _Test2 { const char * str ; double dd ; } test2;
 
-void init_structs() {
-    REGISTER_INTERNAL_STRUCT(_Test2, test2);
-    REGISTER_VAR(test2, dd, double, "%14.4e", stod);
 
+void init_structs()
+{
     REGISTER_INTERNAL_STRUCT(_Test, test);
     REGISTER_VAR(test, a, int, "%9d", stol);
     REGISTER_ARR(test, d, 4, float, "%14.4e", stod);
     REGISTER_VAR(test, f, float, "%14.4e", stod);
     REGISTER_BITFIELD(test, b, unsigned int, "%8X", stoul_0x);
     REGISTER_BITFIELD(test, c, unsigned int, "%8X", stoul_0x);
+
+    REGISTER_INTERNAL_STRUCT(_Test2, test2);
+    REGISTER_VAR(test2, dd, double, "%14.4e", stod);
 }
+

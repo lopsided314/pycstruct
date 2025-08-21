@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <string.h>
@@ -93,18 +94,31 @@ inline std::string veriify_keys(const json &json_obj, const key_list_t &keys) {
  * json library (json.hpp:24351, 'type_name()').
  *
  * Quick reference
- * - "object" // json object
- * - "array" // json object list
+ * - "object"
+ * - "array"
  * - "string"
  * - "boolean"
- * - "number"
+ * - "uint"  |
+ * - "int"   | "number" superset
+ * - "float" |
  */
 using keytype_list_t = std::vector<std::pair<JStringList, std::string>>;
+
 inline std::string verify_key_types(const json &json_obj, const keytype_list_t &keysets) {
     namespace js = JStrings;
 
     JStringList missing_keys;
     const json *ptr = nullptr;
+
+    auto uint_check = [](json::value_t real_type) -> bool {
+        return real_type == json::value_t::number_unsigned;
+    };
+    auto int_check = [uint_check](json::value_t real_type) -> bool {
+        return uint_check(real_type) || real_type == json::value_t::number_integer;
+    };
+    auto float_check = [int_check](json::value_t real_type) -> bool {
+        return int_check(real_type) || real_type == json::value_t::number_float;
+    };
 
     for (auto keytype : keysets) {
         if (keytype.first.size() == 0)
@@ -142,9 +156,17 @@ inline std::string verify_key_types(const json &json_obj, const keytype_list_t &
             } else {
                 // if the target key exists, check the provided type string
                 // against what the json library has found
-                if (keytype.second != ptr->at(end_key).type_name()) {
-                    missing_keys.push_back(type_err + ptr->at(end_key).type_name());
-                }
+                const json::value_t real_type = ptr->at(end_key).type();
+                if (keytype.second == "uint" && uint_check(real_type))
+                    continue;
+                else if (keytype.second == "int" && int_check(real_type))
+                    continue;
+                else if (keytype.second == "float" && float_check(real_type))
+                    continue;
+                else if (keytype.second == ptr->at(end_key).type_name())
+                    continue;
+
+                missing_keys.push_back(type_err + ptr->at(end_key).type_name());
             }
         }
     }
