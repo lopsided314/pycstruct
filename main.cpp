@@ -20,9 +20,9 @@ struct Test2 {
 };
 } // namespace Main
 
-REGISTER_STRUCT(Test, test, -1);
-REGISTER_STRUCT(Test2, test2, -1);
-REGISTER_STRUCT(Name2, name, 4);
+REGISTER_STRUCT(Test, test);
+REGISTER_STRUCT(Test2, test2);
+REGISTER_STRUCT_PACK(Name2, name, 4);
 
 
 volatile uint8_t g_data[1024];
@@ -55,10 +55,15 @@ int main() {
         {"mv", "name->", "0"},
         {"co", "name->a", "-1"},
         {"co", "name->d", "-1", "-.1", "-.01"},
-        {"co", "name->e", "0xbbbb"},
+        {"co", "name->e", "0xabbbb"},
         // {"co", "name->val", "0x111111"},
         {"co", "name->b", "123445678"},
         {"co", "name->c", "deadbeef"},
+        {"ci", "name->"},
+        {"mv", "name->", "100"},
+        {"ci", "name->"},
+        {"mv", "name->", "00"},
+        {"co", "name->d[1]", "-3.1415"},
         {"ci", "name->"},
     };
 
@@ -77,17 +82,15 @@ int main() {
             cmd.s->print(args);
             break;
 
+        case READ_WRITE:
+            read(cmd.data, cmd.size, cmd.offset);
+            cmd.v->set(args);
+            // fall through
         case WRITE:
             write(cmd.data, cmd.size, cmd.offset);
             continue;
             break;
 
-        case WRITE_BITFIELD:
-            read(cmd.data, cmd.size, cmd.offset);
-            cmd.v->set(args);
-            write(cmd.data, cmd.size, cmd.offset);
-            continue;
-            break;
 
         case ERROR:
             return 0;

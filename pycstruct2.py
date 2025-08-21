@@ -327,17 +327,23 @@ def get_object_frame(text:str) -> tuple[str, str]:
 def find_registrations(text:str) -> set[tuple[str, str, str]]:
     registers:set[tuple[str, str, str]] = set()
 
-    text = text.replace('#define REGISTER_STRUCT', '')
+    text = text.replace('#define REGISTER_STRUCT', '') # ignore the macro definition
     while text.find('REGISTER_STRUCT') != -1:
 
         text = text[text.find('REGISTER_STRUCT'):]
 
         name_reg = text[text.find("(")+1 : text.find(")")]
 
-        if ';' in name_reg or '{' in name_reg or '}' in name_reg or name_reg.count(',') != 2:
+        if ';' in name_reg or '{' in name_reg or '}' in name_reg:
             ValueError("Invalid struct registration")
 
-        struct, name, pragma_pack = (s.strip() for s in name_reg.split(',')) 
+        struct, name, pragma_pack = '', '', '-1'
+        if name_reg.count(',') == 1:
+            struct, name = (s.strip() for s in name_reg.split(',')) 
+        elif name_reg.count(',') == 2:
+            struct, name, pragma_pack = (s.strip() for s in name_reg.split(',')) 
+        else:
+            ValueError("Invalid struct registration")
 
         if len(struct) == 0 or len(name) == 0:
             ValueError("Invalid struct registration")
@@ -438,6 +444,7 @@ def main(make_includes:set[str]) -> None:
         struct_cpp:str = f.read()
 
     struct_cpp = re.sub(r'//\s*pycstruct_shit.*', r'//pycstruct_shit\n', struct_cpp, flags=re.DOTALL)
+    struct_cpp = ''
     struct_cpp += instance_def + init_def
 
     with open('structs.cpp', 'w') as f:
