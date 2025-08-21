@@ -2,28 +2,24 @@
 
 
 #include <cstdint>
-
 struct Name2
 { // fasd
     int a;
-    unsigned long b : 12, :20, c:12, :20; // a
+    int b : 20, :12;
+    unsigned int c:12, :20; // a
     float d[4];
     unsigned short e;
     /* this scomment
     alskdfj
     */
-    struct Sub {
-        const char *s;
-        struct Sub2 {
-            int i2;
-        } sub2;
-    } sub1;
+    struct PLPL {
+        uint32_t att:9, :7, phase:9, :7;
+        uint32_t val;
+    } plpl;
     union U {
         int i;
         float f;
-        uint32_t u:12, :20;
+        uint32_t u;
     } u1;
-    struct Sub subs[12];
-    union U u2;
 };
 
