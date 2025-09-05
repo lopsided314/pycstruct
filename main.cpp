@@ -64,6 +64,7 @@ int main() {
         {"ci", "name->"},
         {"mv", "name->", "00"},
         {"co", "name->d[1]", "-3.1415"},
+        {"co", "name->str", "some",  "text"},
         {"ci", "name->"},
     };
 

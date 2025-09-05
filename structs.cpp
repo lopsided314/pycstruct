@@ -29,7 +29,7 @@
  * bitfields. Since bitfields don't have an address, they cannot have data
  * copied to/from them via pointer and must be set by value.
  *
- * The 'set' and 'print' functions have no interaction with memory outside 
+ * The 'set' and 'print' functions have no interaction with memory outside
  * this file. They only operate on the memory in the local struct instances.
  *
  * For read/write operations, the local instances are essentially a translator
@@ -38,13 +38,13 @@
  * the data at that address is being copied into the local struct instance
  * and the print function displays what is in the local instance memory. Same
  * with writing, the value input from the user is parsed and put into local
- * memory and then copied out from the local instance. 
+ * memory and then copied out from the local instance.
  *
- * Since bitfields don't have an address the data pointer returned by the 
+ * Since bitfields don't have an address the data pointer returned by the
  * read/write request is the base address of the whole struct. Arrays will
  * also read/write the full size regardless of which values are being messed
  * with.
- * 
+ *
  ******************************************************************************/
 
 #include "structs.hpp"
@@ -90,6 +90,28 @@ std::map<std::string, Struct> g_structs;
     g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
         (void)args;                                                                                \
         printf(#sname "->" #vname " = " printf_fmt "\n", sname.vname);                             \
+    };
+
+#define REGISTER_CHAR_ARR(sname, vname)                                                            \
+    assert(g_structs.count(#sname) && "Trying to register var with unregistered struct: " #sname); \
+    g_structs[#sname].vars[#vname] = Var{};                                                        \
+    g_structs[#sname].vars[#vname].type = VarType::Std;                                            \
+    g_structs[#sname].vars[#vname].data = (uint8_t *)&sname.vname;                                 \
+    g_structs[#sname].vars[#vname].size = sizeof(sname.vname);                                     \
+    g_structs[#sname].vars[#vname].sizeof_ctype = sizeof(char);                                    \
+    g_structs[#sname].vars[#vname].offset = (size_t) & sname.vname - (size_t) & sname;             \
+    g_structs[#sname].vars[#vname].name = #vname;                                                  \
+    g_structs[#sname].vars[#vname].set = [](const JStringList &args) {                             \
+        std::string s = args[2];                                                                   \
+        for (size_t i = 3; i < args.size(); i++) {                                                 \
+            s += " " + args[i];                                                                    \
+        }                                                                                          \
+        strncpy(sname.vname, s.c_str(), sizeof(sname.vname) - 1);                                  \
+        sname.vname[sizeof(sname.vname) - 1] = '\0';                                               \
+    };                                                                                             \
+    g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
+        (void)args;                                                                                \
+        printf(#sname "->" #vname " = %s\n", sname.vname);                                         \
     };
 
 #define REGISTER_BITFIELD(sname, vname, ctype, printf_fmt, stonum)                                 \
@@ -403,10 +425,10 @@ StructParseOutput parse_struct_input(const JStringList &args) {
 
 //pycstruct_shit
 static struct _Test { int a ; unsigned int b:10 , :6 , c:12 , :4 ; float d [ 4 ] ; float f ; } test;
-#pragma pack(push, 4)
-static struct _Name2 { int a ; int b:20 , :12 ; unsigned int c:12 , :20 ; float d [ 4 ] ; unsigned short e ; struct PLPL { uint32_t att:9 , :7 , phase:9 , :7 ; uint32_t val ; } plpl ; union U { int i ; float f ; uint32_t u ; } u1 ; } name;
-#pragma pack(pop)
 static struct _Test2 { const char * str ; double dd ; } test2;
+#pragma pack(push, 4)
+static struct _Name2 { int a ; int b:20 , :12 ; unsigned int c:12 , :20 ; float d [ 4 ] ; unsigned short e ; struct PLPL { uint32_t att:9 , :7 , phase:9 , :7 ; uint32_t val ; } plpl ; union U { int i ; float f ; uint32_t u ; } u1 ; char str [ 100 ] ; } name;
+#pragma pack(pop)
 
 
 void init_structs()
@@ -418,6 +440,9 @@ void init_structs()
     REGISTER_BITFIELD(test, b, unsigned int, "%8X", stoul_0x);
     REGISTER_BITFIELD(test, c, unsigned int, "%8X", stoul_0x);
 
+    REGISTER_INTERNAL_STRUCT(_Test2, test2);
+    REGISTER_VAR(test2, dd, double, "%14.4e", stod);
+
     REGISTER_INTERNAL_STRUCT(_Name2, name);
     REGISTER_VAR(name, plpl.val, uint32_t, "%08X", stoul_0x);
     REGISTER_BITFIELD(name, plpl.att, uint32_t, "%8X", stoul_0x);
@@ -428,10 +453,8 @@ void init_structs()
     REGISTER_VAR(name, a, int, "%9d", stol);
     REGISTER_ARR(name, d, 4, float, "%14.4e", stod);
     REGISTER_VAR(name, e, unsigned short, "%04X", stoul_0x);
+    REGISTER_CHAR_ARR(name, str)
     REGISTER_BITFIELD(name, b, int, "%9d", stol);
     REGISTER_BITFIELD(name, c, unsigned int, "%8X", stoul_0x);
-
-    REGISTER_INTERNAL_STRUCT(_Test2, test2);
-    REGISTER_VAR(test2, dd, double, "%14.4e", stod);
 }
 
