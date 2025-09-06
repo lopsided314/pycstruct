@@ -19,10 +19,12 @@ Basically what this does...
 
 '''
 
-DEBUG_PRINT = True
+DEBUG_PRINT = False
 # turn the user code into format easier for the parser to deal with
 def deformat_source(src_text:str) -> str:
     src_text = src_text.strip()
+
+    src_text = src_text.replace('\\', '')
 
     # get rid of the comments manually since
     # the regex is doing weird shit
@@ -343,7 +345,7 @@ def get_object_frame(text:str) -> tuple[str, str]:
             frame = text[:def_end].strip()
             remainder = text[def_end+1:].strip()
 
-            if any(c in frame for c in bad_chars):
+            if any(c in frame for c in bad_chars) or frame == '\\':
                 return '__skipped__', remainder
 
             s_or_u = frame.split(' ')[0]
@@ -426,7 +428,7 @@ def main(make_includes:set[str]) -> None:
         if not any(filename[-len(ext):] == ext for ext in valid_exts):
             return False
 
-        files_to_skip:tuple[str, ...] = ('json.hpp', 'structs.hpp', 'structs.cpp')
+        files_to_skip:tuple[str, ...] = ()
         if any(os.path.basename(filename) == skip for skip in files_to_skip):
             return False
 
@@ -453,7 +455,7 @@ def main(make_includes:set[str]) -> None:
                 registered_structs.update(find_registrations(filetext))
                 defined_structs.update(find_struct_defs(filetext))
         except Exception as e:
-            print(filename, e)
+            print('Pycstruct:', filename, e)
             exit(1)
 
 
@@ -483,7 +485,7 @@ def main(make_includes:set[str]) -> None:
     with open('structs.cpp') as f:
         struct_cpp:str = f.read()
 
-    struct_cpp = re.sub(r'//\s*pycstruct_shit.*', r'//pycstruct_shit\n', struct_cpp, flags=re.DOTALL)
+    struct_cpp = re.sub(r'//\s*pycstruct_shit.*', '//pycstruct_shit\n', struct_cpp, flags=re.DOTALL)
     struct_cpp += instance_def + init_def
 
     with open('structs.cpp', 'w') as f:
