@@ -436,25 +436,25 @@ void init_structs()
 {
     REGISTER_INTERNAL_STRUCT(_Name2, name);
     REGISTER_VAR(name, plpl.val, uint32_t, "%08X", stoul_0x);
-    REGISTER_BITFIELD(name, plpl.att, uint32_t, "%8X", stoul_0x);
-    REGISTER_BITFIELD(name, plpl.phase, uint32_t, "%8X", stoul_0x);
-    REGISTER_VAR(name, u1.i, int, "%9d", stol);
-    REGISTER_VAR(name, u1.f, float, "%14.4e", stod);
+    REGISTER_BITFIELD(name, plplatt, uint32_t, "%8X", stoul_0x);
+    REGISTER_BITFIELD(name, plplphase, uint32_t, "%8X", stoul_0x);
+    REGISTER_VAR(name, u1.i, int, "%11d", stol);
+    REGISTER_VAR(name, u1.f, float, "%11.4e", stod);
     REGISTER_VAR(name, u1.u, uint32_t, "%08X", stoul_0x);
-    REGISTER_VAR(name, a, int, "%9d", stol);
-    REGISTER_ARR(name, d, 4, float, "%14.4e", stod);
+    REGISTER_VAR(name, a, int, "%11d", stol);
+    REGISTER_ARR(name, d, 4, float, "%11.4e", stod);
     REGISTER_VAR(name, e, unsigned short, "%04X", stoul_0x);
     REGISTER_CHAR_ARR(name, str)
-    REGISTER_BITFIELD(name, b, int, "%9d", stol);
+    REGISTER_BITFIELD(name, b, int, "%11d", stol);
     REGISTER_BITFIELD(name, c, unsigned int, "%8X", stoul_0x);
 
     REGISTER_INTERNAL_STRUCT(_Test2, test2);
-    REGISTER_VAR(test2, dd, double, "%14.4e", stod);
+    REGISTER_VAR(test2, dd, double, "%11.4e", stod);
 
     REGISTER_INTERNAL_STRUCT(_Test, test);
-    REGISTER_VAR(test, a, int, "%9d", stol);
-    REGISTER_ARR(test, d, 4, float, "%14.4e", stod);
-    REGISTER_VAR(test, f, float, "%14.4e", stod);
+    REGISTER_VAR(test, a, int, "%11d", stol);
+    REGISTER_ARR(test, d, 4, float, "%11.4e", stod);
+    REGISTER_VAR(test, f, float, "%11.4e", stod);
     REGISTER_BITFIELD(test, b, unsigned int, "%8X", stoul_0x);
     REGISTER_BITFIELD(test, c, unsigned int, "%8X", stoul_0x);
 }

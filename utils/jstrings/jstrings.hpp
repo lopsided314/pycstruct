@@ -9,6 +9,7 @@
 #include <stdexcept> // invlaid_argument, out_of_range
 #include <string.h>  // memcpy
 #include <string>
+#include <type_traits>
 
 using JStringList = std::deque<std::string>;
 
@@ -180,27 +181,17 @@ inline void strip(std::string *str, std::string char_set, StripBehavior sb = Bot
     assert(str != nullptr);
     if (sb & Left) {
 
-        str->erase(
-            str->begin(), 
-            std::find_if(
-                str->begin(), 
-                str->end(), 
-                [char_set](char c) {
-                   return char_set.find(c) == std::string::npos;
-                })
-            );
+        str->erase(str->begin(), std::find_if(str->begin(), str->end(), [char_set](char c) {
+                       return char_set.find(c) == std::string::npos;
+                   }));
     }
     if (sb & Right) {
 
         str->erase(
-            std::find_if(
-                str->rbegin(), 
-                str->rend(),
-                [char_set](char c) { 
-                    return char_set.find(c) == std::string::npos; 
-                }).base(),
-            str->end()
-        );
+            std::find_if(str->rbegin(), str->rend(),
+                         [char_set](char c) { return char_set.find(c) == std::string::npos; })
+                .base(),
+            str->end());
     }
 }
 inline std::string strip(std::string str, std::string char_set, StripBehavior sb = Both) {
@@ -415,7 +406,7 @@ inline JStringList combine_lists(const JStringList &list1, const JStringList &li
 
 inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
     if (err)
-        *err = "stoul_0x(\"" + str + "\"): ";
+        err->clear();
 
     unsigned long val = 0;
     size_t idx = 0;
@@ -424,22 +415,20 @@ inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
         val = std::stoul(str, &idx, 16);
     } catch (const std::invalid_argument &) {
         if (err)
-            *err += "invalid_argument";
+            *err = "stoul_0x(\"" + str + "\"): invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
         if (err)
-            *err += "out_of_range";
+            *err = "stoul_0x(\"" + str + "\"): out_of_range";
         return val;
     }
 
     if (idx != str.length()) {
         if (err)
-            *err += "invalid_argument";
+            *err = "stoul_0x(\"" + str + "\"): invalid_argument";
         return val;
     }
 
-    if (err)
-        *err = "";
     return val;
 }
 
@@ -447,7 +436,7 @@ inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
 
 inline long stol(std::string str, std::string *err = nullptr) {
     if (err)
-        *err = "stol(\"" + str + "\"): ";
+        err->clear();
 
     long val = 0;
     size_t idx = 0;
@@ -456,22 +445,20 @@ inline long stol(std::string str, std::string *err = nullptr) {
         val = std::stol(str, &idx);
     } catch (const std::invalid_argument &) {
         if (err)
-            *err += "invalid_argument";
+            *err = "stol(\"" + str + "\"): invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
         if (err)
-            *err += "out_of_range";
+            *err = "stol(\"" + str + "\"): out_of_range";
         return val;
     }
 
     if (idx != str.length()) {
         if (err)
-            *err += "invalid_argument";
+            *err = "stol(\"" + str + "\"): invalid_argument";
         return val;
     }
 
-    if (err)
-        *err = "";
     return val;
 }
 
@@ -480,7 +467,8 @@ inline long stol(std::string str, std::string *err = nullptr) {
 inline double stod(std::string str, std::string *err = nullptr) {
 
     if (err)
-        *err = "stod(\"" + str + "\"): ";
+        err->clear();
+
     double val = 0;
     int exponent = 0;
     size_t idx = 0;
@@ -491,68 +479,68 @@ inline double stod(std::string str, std::string *err = nullptr) {
             JStringList spl = JStrings::split(str, "e", TrimAll);
             if (spl.size() != 2) {
                 if (err)
-                    *err += "Invalid scientific notation";
+                    *err = "stod(\"" + str + "\"): invalid_argument";
                 return val;
             }
 
             val = std::stod(spl[0], &idx);
             if (idx != spl[0].length()) {
                 if (err)
-                    *err += "invalid mantissa";
+                    *err = "stod(\"" + str + "\"): invalid_argument";
                 return val;
             }
 
             exponent = std::stol(spl[1], &idx);
             if (idx != spl[1].length()) {
                 if (err)
-                    *err += "invalid exponent";
+                    *err = "stod(\"" + str + "\"): invalid_arguemnt";
                 return val;
             }
-            double base = exponent > 0 ? 10 : .1;
+            double e = exponent > 0 ? 10 : .1;
             exponent = abs(exponent);
 
-            while (exponent-- > 0) {
-                val *= base;
+            while (exponent --> 0) {
+                val *= e;
             }
         } else {
             val = std::stod(str, &idx);
             if (idx != str.length()) {
                 if (err)
-                    *err += "invalid_argument";
+                    *err = "stod(\"" + str + "\"): invalid_argument";
                 return val;
             }
         }
     } catch (const std::invalid_argument &) {
         if (err)
-            *err += "invalid_argument";
+            *err = "stod(\"" + str + "\"): invalid_argument";
         return val;
     } catch (const std::out_of_range &) {
         if (err)
-            *err += "out_of_range";
+            *err = "stod(\"" + str + "\"): out_of_range";
         return val;
     }
 
-    if (err)
-        *err = "";
     return val;
 }
 
 /*===========================================================================*/
 
 template <typename Number_t> inline std::string as_bin(Number_t val) {
-    static_assert(sizeof(Number_t) <= 8, "Binary format not supported");
+    static_assert(
+        (std::is_arithmetic<Number_t>::value || std::is_pointer<Number_t>::value) && sizeof(Number_t) <= 8,
+        "Cannot print type as binary"
+    );
     uint64_t data = 0;
     memcpy(&data, &val, sizeof(val));
 
-    size_t str_end = sizeof(val) * 8 + sizeof(val) - 1 + 1;
-    char buf[64] = {0};
-    for (int iBit = 0, iBuf = str_end - 2; iBit < sizeof(val) * 8 && iBuf >= 0; iBit++, iBuf--) {
+    size_t iBuf = (sizeof(val) * 8) + (sizeof(val) - 1) - 1;
+    char buf[100] = {0};
+    for (int iBit = 0; iBit < sizeof(val) * 8 && iBuf >= 0; iBit++) {
         if (iBit > 0 && (iBit % 8 == 0)) {
-            buf[iBuf] = '_';
-            iBuf--;
+            buf[iBuf--] = '_';
         }
 
-        buf[iBuf] = (data & (1UL << iBit)) > 0 ? '1' : '0';
+        buf[iBuf--] = (data & (1UL << iBit)) == 0 ? '0' : '1';
     }
     return buf;
 }

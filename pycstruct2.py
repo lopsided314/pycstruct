@@ -19,7 +19,9 @@ Basically what this does...
 
 '''
 
+DIR = os.path.dirname(os.path.abspath(__file__))
 DEBUG_PRINT = False
+
 # turn the user code into format easier for the parser to deal with
 def deformat_source(src_text:str) -> str:
     src_text = src_text.strip()
@@ -86,18 +88,18 @@ def deformat_source(src_text:str) -> str:
 #     return '\n'.join(lines)
 
 cli_types:dict[str, tuple[str, str, str]] = {
-    'i8': ('i8', '%3d', 'stol'),
+    'i8': ('i8', '%4d', 'stol'),
     'u8': ('u8', '%02X', 'stoul_0x'),
-    'i16': ('i16', '%5d', 'stol'),
+    'i16': ('i16', '%6d', 'stol'),
     'u16': ('u16', '%04X', 'stoul_0x'),
-    'i32': ('i32', '%9d', 'stol'),
+    'i32': ('i32', '%11d', 'stol'),
     'u32': ('u32', '%08X', 'stoul_0x'),
     'i64': ('i64', '%20ld', 'stol'),
     'li64': ('i64', '%20lld', 'stol'),
     'u64': ('u64', '%016lX', 'stoul_0x'),
     'lu64': ('u64', '%016llX', 'stoul_0x'),
-    'f32': ('f32', '%14.4e', 'stod'),
-    'f64': ('f64', '%14.4e', 'stod') ,
+    'f32': ('f32', '%11.4e', 'stod'),
+    'f64': ('f64', '%11.4e', 'stod') ,
 }
 ctype_fmts:dict[str, tuple[str,str,str]] = {
     'bool':('u8', '%1X', 'stoul_0x'),
@@ -156,7 +158,7 @@ class CStdVar:
         elif not is_arr and len(def_split) < 2:
             raise ValueError(f'Invalid member declaration: "{var_def}"')
 
-        self.size:str = def_split.pop() if is_arr else '0'
+        self.size:int = int(def_split.pop()) if is_arr else 0
         self.name:str = def_split.pop()
         self.ctype:str = ' '.join(def_split)
 
@@ -193,16 +195,16 @@ class ObjectFrame:
 
         self.parents:list[ObjectFrame] = parents
         self.raw_full:str = body_def.strip()
-        self.frame_type:str = body_def.split(' ')[0]
-        self.instance_name:str = body_def[body_def.rfind('}')+1 : body_def.rfind(';')].strip()
+        self.instance_name:str = body_def[body_def.rfind('}')+1 : body_def.rfind(';')].strip() # struct S {} s;
 
+        self.frame_type:str = body_def.split(' ')[0] # struct, union
         self.typename:str = body_def.split(' ')[1]
+        self.frame_type, self.typename = body_def.split(' ')[:2]
         if self.typename == '{': # nameless struct
             self.typename = '_' + self.frame_type.capitalize()
 
-        # remove the opening and closing of the main body
-        self.raw_body:str = self.raw_full[self.raw_full.find('{')+1:]
-        self.raw_body = self.raw_body[:self.raw_body.rfind('}')]
+        # isolate the contents of the struct
+        self.raw_body:str = self.raw_full[self.raw_full.find('{')+1:self.raw_full.rfind('}')]
 
         self.frames:list['ObjectFrame'] = []
         self.bitfields:list[CBitfield] = []
@@ -229,7 +231,7 @@ class ObjectFrame:
 
         for v in self.vars:
             var_info = f'{header} {v.ctype} {v.name}'
-            if v.size == '0':
+            if v.size == 0:
                 print(f"{var_info};")
             else:
                 print(f"{var_info}[{v.size}];")
@@ -241,26 +243,28 @@ class ObjectFrame:
         for frame in self.frames:
             macros += frame.reg_macros(base_name)
 
-        if len(self.combo_name) > 0:
-            self.combo_name += '.'
-
         for v in self.vars:
-            if v.ctype in ctype_fmts:
-                _, printf, stonum = ctype_fmts[v.ctype]
-                if v.size == '0':
-                    macros.append(f'REGISTER_VAR({base_name}, {self.combo_name}{v.name}, {v.ctype}, "{printf}", {stonum});')
-                elif v.ctype == 'char':
-                    macros.append(f'REGISTER_CHAR_ARR({base_name}, {self.combo_name}{v.name})')
-                else:
-                    macros.append(f'REGISTER_ARR({base_name}, {self.combo_name}{v.name}, {v.size}, {v.ctype}, "{printf}", {stonum});')
+            if v.ctype not in ctype_fmts:
+                continue
+
+            var_name:str = f'{self.combo_name+"." if self.combo_name else ""}{v.name}'
+            print(var_name)
+
+            _, printf, stonum = ctype_fmts[v.ctype]
+            if v.size == 0:
+                macros.append(f'REGISTER_VAR({base_name}, {var_name}, {v.ctype}, "{printf}", {stonum});')
+            elif v.ctype == 'char':
+                macros.append(f'REGISTER_CHAR_ARR({base_name}, {var_name})')
+            else:
+                macros.append(f'REGISTER_ARR({base_name}, {var_name}, {v.size}, {v.ctype}, "{printf}", {stonum});')
 
 
         for b in self.bitfields:
             if b.ctype in ctype_fmts:
                 _, printf, stonum = ctype_fmts[b.ctype]
                 printf = printf.replace("0","")
-                for name, _ in b.fields:
-                    macros.append(f'REGISTER_BITFIELD({base_name}, {self.combo_name}{name}, {b.ctype}, "{printf}", {stonum});')
+                for var_name, _ in b.fields:
+                    macros.append(f'REGISTER_BITFIELD({base_name}, {self.combo_name}{var_name}, {b.ctype}, "{printf}", {stonum});')
 
         return macros
 
@@ -292,11 +296,9 @@ class ObjectFrame:
             elif len(member.strip()) != 0:
                 self.vars.append(CStdVar(member))
 
-    
+
 def get_object_frame(text:str) -> tuple[str, str]:
-    # frame, remainder, type (struct, union), typename, varname
     # return the first full brace enclosure and the remainder of the text
-    # are there more than just structs and unions?
 
     END:int = 1 << 31
     pos_end = lambda i: i if i >= 0 else END
@@ -323,7 +325,7 @@ def get_object_frame(text:str) -> tuple[str, str]:
     first_bad_char:int = min(pos_end(text.find(c)) for c in bad_chars)
 
     if min(first_bad_char, first_semi, first_close) < first_open:
-        return '__skipped__', text[first_bad_char+1:]
+        return '__skipped__', text[5:]
 
     indent_level:int = 0
     for i, c in enumerate(text):
@@ -415,24 +417,22 @@ def find_struct_defs(text:str) -> dict[str, ObjectFrame]:
 
 
 
+# Do we want anything to do with this file
+def valid_file(filename:str) -> bool:
+    if not os.path.isfile(filename):
+        return False
+    
+    valid_exts:tuple[str, ...] = ('.cpp', '.c', '.hpp', '.h')
+    if not any(filename[-len(ext):] == ext for ext in valid_exts):
+        return False
 
+    files_to_skip:tuple[str, ...] = ()
+    if any(os.path.basename(filename) == skip for skip in files_to_skip):
+        return False
 
-def main(make_includes:set[str]) -> None:
+    return True
 
-    # Do we want anything to do with this file
-    def _valid_file(filename:str) -> bool:
-        if not os.path.isfile(filename):
-            return False
-        
-        valid_exts:tuple[str, ...] = ('.cpp', '.c', '.hpp', '.h')
-        if not any(filename[-len(ext):] == ext for ext in valid_exts):
-            return False
-
-        files_to_skip:tuple[str, ...] = ()
-        if any(os.path.basename(filename) == skip for skip in files_to_skip):
-            return False
-
-        return True
+def main(make_includes:list[str]) -> None:
 
     source_files:set[str] = set(glob.glob('./**', recursive=True))
     
@@ -443,7 +443,8 @@ def main(make_includes:set[str]) -> None:
         elif os.path.isfile(arg):
             source_files.add(arg)
 
-    source_files = {os.path.realpath(file) for file in source_files if _valid_file(file)}
+    source_files = {os.path.realpath(file) for file in source_files if valid_file(file)}
+    print(f'Pycstruct: Scanning {len(source_files)} files...')
 
     defined_structs:dict[str, ObjectFrame] = {}
     registered_structs:set[tuple[str, str, str]] = set()
@@ -482,13 +483,13 @@ def main(make_includes:set[str]) -> None:
     instance_def = f'{static_instances}\n\n'
     init_def = f'void init_structs()\n{{\n    {registers.strip()}\n}}\n\n'
 
-    with open('structs.cpp') as f:
+    with open(DIR+'/structs.cpp') as f:
         struct_cpp:str = f.read()
 
     struct_cpp = re.sub(r'//\s*pycstruct_shit.*', '//pycstruct_shit\n', struct_cpp, flags=re.DOTALL)
     struct_cpp += instance_def + init_def
 
-    with open('structs.cpp', 'w') as f:
+    with open(DIR+'/structs.cpp', 'w') as f:
         f.write(struct_cpp)
 
 
@@ -496,7 +497,7 @@ def main(make_includes:set[str]) -> None:
 
 
 if __name__ == "__main__":
-    main(set(sys.argv[1:]))
+    main(sys.argv[1:])
 
     
 
