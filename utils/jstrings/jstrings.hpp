@@ -368,19 +368,21 @@ inline JStringList split(std::string str, std::string key, int sb = None) {
 /*===========================================================================*/
 
 inline std::string repeat(std::string str, size_t count) {
+    std::string ret;
     for (size_t i = 0; i < count; i++) {
-        str += str;
+        ret += str;
     }
-    return str;
+    return ret;
 }
 
 inline JStringList repeat(JStringList strs, size_t count) {
+    JStringList ret;
     for (size_t i = 0; i < count; i++) {
         for (std::string str : strs) {
-            strs.push_back(str);
+            ret.push_back(str);
         }
     }
-    return strs;
+    return ret;
 }
 
 /*===========================================================================*/
