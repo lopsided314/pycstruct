@@ -46,5 +46,5 @@ int main() {
     std::string split_test = "ex ex  ex ";
     auto split_ret = js::split(split_test, "x", JStrings::TrimAll);
 
-    std::cout << js::contains_all(ex, "exlEt") << "\n";
+    std::cout << js::as_bin(&ex) << "\n";
 }

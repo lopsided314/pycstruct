@@ -54,7 +54,7 @@ inline json read(std::string path, std::string *err = nullptr) noexcept {
  *
  */
 using key_list_t = std::vector<JStringList>;
-inline std::string veriify_keys(const json &json_obj, const key_list_t &keys) {
+inline std::string verify_keys(const json &json_obj, const key_list_t &keys) {
     namespace js = JStrings;
 
     // accumulate all the keys that don't get found
@@ -109,6 +109,8 @@ inline std::string verify_key_types(const json &json_obj, const keytype_list_t &
 
     JStringList missing_keys;
     const json *ptr = nullptr;
+
+    // unsigned int is valid int and float, etc.
 
     auto uint_check = [](json::value_t real_type) -> bool {
         return real_type == json::value_t::number_unsigned;

@@ -49,22 +49,24 @@ int main() {
     init_structs();
 
     std::vector<JStringList> arg_sets = {
-        {"mv", "name->", "4"},
-        {"co", "name->plpl.att", "0xfff"},
-        {"co", "name->plpl.phase", "0xfff"},
-        {"mv", "name->", "0"},
+        // {"mv", "name->", "4"},
+        // {"co", "name->plpl.att", "0xfff"},
+        // {"co", "name->plpl.phase", "0xfff"},
+        // {"mv", "name->", "0"},
         {"co", "name->a", "-1"},
-        {"co", "name->d", "-1", "-.1", "-.01"},
+        // {"co", "name->d", "-1", "-.1", "-.01"},
         {"co", "name->e", "0xabbbb"},
         // {"co", "name->val", "0x111111"},
-        {"co", "name->b", "123445678"},
-        {"co", "name->c", "deadbeef"},
+        // {"co", "name->b", "123445678"},
+        // {"co", "name->c", "deadbeef"},
         {"ci", "name->"},
-        {"mv", "name->", "100"},
-        {"ci", "name->"},
-        {"mv", "name->", "00"},
-        {"co", "name->d[1]", "-3.1415"},
-        {"ci", "name->"},
+        {"ci", "name->plpl*"},
+        // {"mv", "name->", "100"},
+        // {"ci", "name->"},
+        // {"mv", "name->", "00"},
+        // {"co", "name->d[1]", "-3.1415"},
+        // {"co", "name->str", "some",  "text"},
+        // {"ci", "name->"},
     };
 
     for (const JStringList &args : arg_sets) {
@@ -88,16 +90,18 @@ int main() {
             // fall through
         case WRITE:
             write(cmd.data, cmd.size, cmd.offset);
-            continue;
             break;
 
-
         case ERROR:
+            std::cout << "error\n";
             return 0;
 
         case PASS:
-            std::cout << js::join(args, " ");
+            std::cout << "pass: " << js::join(args, " ") << "\n";
+            break;
+
         default:
+            std::cout << "default???\n";
             break;
         }
         std::cout << "\n";
