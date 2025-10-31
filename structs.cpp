@@ -60,6 +60,8 @@ static std::string g_err;
 namespace js = JStrings;
 std::map<std::string, Struct> g_structs;
 
+// the print here allows for printing all partial variable name matches. Makes things
+// like name->plpl
 #define REGISTER_INTERNAL_STRUCT(structtype, sname)                                                \
     g_structs[#sname] = Struct{};                                                                  \
     g_structs[#sname].data = (uint8_t *)&sname;                                                    \
@@ -67,8 +69,10 @@ std::map<std::string, Struct> g_structs;
     g_structs[#sname].name = #sname;                                                               \
     g_structs[#sname].type = #structtype;                                                          \
     g_structs[#sname].print = [](const JStringList &args) {                                        \
+        std::string partial_name = js::strip(args[1], "*");                                        \
         for (const auto &var : g_structs[#sname].vars) {                                           \
-            var.second.print(args);                                                                \
+            if (js::contains(#sname "->" + var.first, partial_name))                               \
+                var.second.print(args);                                                            \
         }                                                                                          \
         std::cout << "\n";                                                                         \
     };
@@ -288,11 +292,18 @@ StructFind get_struct(std::string svname) {
     }
     if (g_structs.count(sname)) {
         ret.s = &g_structs[sname];
-        if (g_structs[sname].vars.count(vname)) {
-            ret.v = &g_structs[sname].vars[vname];
-        } else if (vname.length() > 0) {
-            // if we asked for a name and it doesn't exist, invalid
-            ret.s = nullptr;
+        
+        if (vname.length() > 0) {
+
+            if (g_structs[sname].vars.count(vname)) {
+                // retrieve the struct member
+                ret.v = &g_structs[sname].vars[vname];
+            } else if (vname.back() == '*') {
+                 // allow wildcard passing through
+            } else {
+                // if a name was provided but not found, error
+                ret.s = nullptr;
+            }
         }
     }
     return ret;
@@ -424,30 +435,38 @@ StructParseOutput parse_struct_input(const JStringList &args) {
  * EVERYTHING IN THIS FILE AFTER THIS LINE WILL BE OVERWRITTEN
  */
 
-//pycstruct_shit
+// pycstruct_shit
+static struct _Test2 {
+    const char *str;
+    double dd;
+} test2;
+static struct _Test {
+    int a;
+    unsigned int b : 10, : 6, c : 12, : 4;
+    float d[4];
+    float f;
+} test;
 #pragma pack(push, 4)
-static struct _Name2 { int a ; int b:20 , :12 ; unsigned int c:12 , :20 ; float d [ 4 ] ; unsigned short e ; struct PLPL { uint32_t att:9 , :7 , phase:9 , :7 ; uint32_t val ; } plpl ; union U { int i ; float f ; uint32_t u ; } u1 ; char str [ 100 ] ; } name;
+static struct _Name2 {
+    int a;
+    int b : 20, : 12;
+    unsigned int c : 12, : 20;
+    float d[4];
+    unsigned short e;
+    struct PLPL {
+        uint32_t att : 9, : 7, phase : 9, : 7;
+        uint32_t val;
+    } plpl;
+    union U {
+        int i;
+        float f;
+        uint32_t u;
+    } u1;
+    char str[100];
+} name;
 #pragma pack(pop)
-static struct _Test2 { const char * str ; double dd ; } test2;
-static struct _Test { int a ; unsigned int b:10 , :6 , c:12 , :4 ; float d [ 4 ] ; float f ; } test;
 
-
-void init_structs()
-{
-    REGISTER_INTERNAL_STRUCT(_Name2, name);
-    REGISTER_VAR(name, plpl.val, uint32_t, "%08X", stoul_0x);
-    REGISTER_BITFIELD(name, plplatt, uint32_t, "%8X", stoul_0x);
-    REGISTER_BITFIELD(name, plplphase, uint32_t, "%8X", stoul_0x);
-    REGISTER_VAR(name, u1.i, int, "%11d", stol);
-    REGISTER_VAR(name, u1.f, float, "%11.4e", stod);
-    REGISTER_VAR(name, u1.u, uint32_t, "%08X", stoul_0x);
-    REGISTER_VAR(name, a, int, "%11d", stol);
-    REGISTER_ARR(name, d, 4, float, "%11.4e", stod);
-    REGISTER_VAR(name, e, unsigned short, "%04X", stoul_0x);
-    REGISTER_CHAR_ARR(name, str)
-    REGISTER_BITFIELD(name, b, int, "%11d", stol);
-    REGISTER_BITFIELD(name, c, unsigned int, "%8X", stoul_0x);
-
+void init_structs() {
     REGISTER_INTERNAL_STRUCT(_Test2, test2);
     REGISTER_VAR(test2, dd, double, "%11.4e", stod);
 
@@ -457,5 +476,18 @@ void init_structs()
     REGISTER_VAR(test, f, float, "%11.4e", stod);
     REGISTER_BITFIELD(test, b, unsigned int, "%8X", stoul_0x);
     REGISTER_BITFIELD(test, c, unsigned int, "%8X", stoul_0x);
-}
 
+    REGISTER_INTERNAL_STRUCT(_Name2, name);
+    REGISTER_VAR(name, plpl.val, uint32_t, "%08X", stoul_0x);
+    REGISTER_BITFIELD(name, plpl.att, uint32_t, "%8X", stoul_0x);
+    REGISTER_BITFIELD(name, plpl.phase, uint32_t, "%8X", stoul_0x);
+    REGISTER_VAR(name, u1.i, int, "%11d", stol);
+    REGISTER_VAR(name, u1.f, float, "%11.4e", stod);
+    REGISTER_VAR(name, u1.u, uint32_t, "%08X", stoul_0x);
+    REGISTER_VAR(name, a, int, "%11d", stol);
+    REGISTER_ARR(name, d, 4, float, "%11.4e", stod);
+    REGISTER_VAR(name, e, unsigned short, "%04X", stoul_0x);
+    REGISTER_CHAR_ARR(name, str)
+    REGISTER_BITFIELD(name, b, int, "%11d", stol);
+    REGISTER_BITFIELD(name, c, unsigned int, "%8X", stoul_0x);
+}

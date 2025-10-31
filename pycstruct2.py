@@ -260,11 +260,15 @@ class ObjectFrame:
 
 
         for b in self.bitfields:
-            if b.ctype in ctype_fmts:
-                _, printf, stonum = ctype_fmts[b.ctype]
-                printf = printf.replace("0","")
-                for var_name, _ in b.fields:
-                    macros.append(f'REGISTER_BITFIELD({base_name}, {self.combo_name}{var_name}, {b.ctype}, "{printf}", {stonum});')
+            if b.ctype not in ctype_fmts:
+                continue
+
+            _, printf, stonum = ctype_fmts[b.ctype]
+            printf = printf.replace("0","")
+            for var_name, _ in b.fields:
+                var_name = f'{self.combo_name+"." if self.combo_name else ""}{var_name}'
+                print(var_name)
+                macros.append(f'REGISTER_BITFIELD({base_name}, {var_name}, {b.ctype}, "{printf}", {stonum});')
 
         return macros
 
