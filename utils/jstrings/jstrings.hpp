@@ -17,6 +17,7 @@ namespace JStrings {
 
 /*===========================================================================*/
 
+// Same thing as sprintf but with std::strings
 inline std::string sprintf(std::string fmt, ...) {
     char buf[2000] = {0};
     va_list args;
@@ -67,6 +68,16 @@ inline bool contains_all(const std::string &str, std::string chars) {
 inline bool contains_all(const JStringList &strs, const JStringList &keys) {
     for (const std::string &key : keys) {
         if (std::find(strs.begin(), strs.end(), key) == strs.end())
+            return false;
+    }
+    return true;
+}
+
+/*===========================================================================*/
+
+inline bool contains_only(const std::string &str, std::string chars) {
+    for (char c : str) {
+        if (chars.find(c) == std::string::npos)
             return false;
     }
     return true;
@@ -175,23 +186,25 @@ inline std::string center_pad(std::string str, int new_size, char pad_char = ' '
 
 /*===========================================================================*/
 
+//
+// Remove all characters in char_set from the left/right/both sides of str. Does
+// the same as the python str.strip()
+//
+
 enum StripBehavior : int { Left = 1, Right = 2, Both = Left | Right };
 
 inline void strip(std::string *str, std::string char_set, StripBehavior sb = Both) {
     assert(str != nullptr);
-    if (sb & Left) {
 
-        str->erase(str->begin(), std::find_if(str->begin(), str->end(), [char_set](char c) {
-                       return char_set.find(c) == std::string::npos;
-                   }));
+    auto chars_contain = [char_set](char c) -> bool {
+        return char_set.find(c) == std::string::npos;
+    };
+
+    if (sb & Left) {
+        str->erase(str->begin(), std::find_if(str->begin(), str->end(), chars_contain));
     }
     if (sb & Right) {
-
-        str->erase(
-            std::find_if(str->rbegin(), str->rend(),
-                         [char_set](char c) { return char_set.find(c) == std::string::npos; })
-                .base(),
-            str->end());
+        str->erase(std::find_if(str->rbegin(), str->rend(), chars_contain).base(), str->end());
     }
 }
 inline std::string strip(std::string str, std::string char_set, StripBehavior sb = Both) {
@@ -209,6 +222,12 @@ inline std::string strip(std::string str, StripBehavior sb = Both) {
 }
 
 /*===========================================================================*/
+
+//
+// String slicing
+//
+// Supports negative indexing, works the same way as Python strings
+//
 
 const static int32_t end = INT32_MAX;
 inline void slice(std::string *str, int32_t start, int32_t stop) {
@@ -244,14 +263,14 @@ inline std::string slice(std::string str, int start, int stop) {
 
 /*===========================================================================*/
 
-// replace
 enum ReplaceBehavior : int { First = 1, Last = 2, All = First | Last };
 
 inline void replace(std::string *str, std::string key, std::string sub, int rb = All) {
     assert(str != nullptr);
 
-    if (str->find(key) == std::string::npos || key.length() == 0)
+    if (str->find(key) == std::string::npos || key.length() == 0) {
         return;
+    }
 
     bool no_copy = (key.length() == sub.length());
 
@@ -406,6 +425,9 @@ inline JStringList combine_lists(const JStringList &list1, const JStringList &li
 
 /*===========================================================================*/
 
+//
+// wrapper for std::stoul(..., 16) but with better errors and no exceptions
+//
 inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
     if (err)
         err->clear();
@@ -436,6 +458,9 @@ inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
 
 /*===========================================================================*/
 
+//
+// wrapper for std::stol but with better errors and no exceptions
+//
 inline long stol(std::string str, std::string *err = nullptr) {
     if (err)
         err->clear();
@@ -466,6 +491,10 @@ inline long stol(std::string str, std::string *err = nullptr) {
 
 /*===========================================================================*/
 
+//
+// wrapper for std::stod but with better errors and no exceptions. Also 
+// supports scientific notation, e.g. 2.998e8 or 1.38e-23
+//
 inline double stod(std::string str, std::string *err = nullptr) {
 
     if (err)
@@ -527,24 +556,87 @@ inline double stod(std::string str, std::string *err = nullptr) {
 
 /*===========================================================================*/
 
+//
+// Returns the binary representation of a numeric type
+//
 template <typename Number_t> inline std::string as_bin(Number_t val) {
-    static_assert(
-        (std::is_arithmetic<Number_t>::value || std::is_pointer<Number_t>::value) && sizeof(Number_t) <= 8,
-        "Cannot print type as binary"
-    );
+    static_assert((std::is_arithmetic<Number_t>::value || std::is_pointer<Number_t>::value) &&
+                      sizeof(Number_t) <= 8,
+                  "Cannot print type as binary");
+    
+    // Put the bits into a data type that supports bit operations.
     uint64_t data = 0;
     memcpy(&data, &val, sizeof(val));
 
-    size_t iBuf = (sizeof(val) * 8) + (sizeof(val) - 1) - 1;
-    char buf[100] = {0};
-    for (int iBit = 0; iBit < sizeof(val) * 8 && iBuf >= 0; iBit++) {
-        if (iBit > 0 && (iBit % 8 == 0)) {
-            buf[iBuf--] = '_';
+    // Move through the bits of the data and set the character in the 
+    // corresponding index of the string. Inserts visual spacers at
+    // set intervals.
+    //
+    // Indexing reversed for the string so LSB appears on the right.
+
+    char str[100] = {0};
+    size_t spacer_spacing = 4;
+     
+    // starting index in string
+    // (# of bits) + (# of spacers) - (offset due to indexing from 0)
+    int iStr = (sizeof(val) * 8) + (sizeof(val) * 8 / spacer_spacing - 1) - 1;
+
+    for (size_t iBit = 0; iBit < sizeof(val) * 8 && iStr >= 0; iBit++) {
+        if (iBit > 0 && (iBit % spacer_spacing == 0)) {
+            str[iStr--] = '_';
         }
 
-        buf[iBuf--] = (data & (1UL << iBit)) == 0 ? '0' : '1';
+        str[iStr--] = (data & (1UL << iBit)) == 0 ? '0' : '1';
     }
-    return buf;
+    return str;
+}
+
+//
+// Try to cram some binary digits into a number
+//
+template <typename Number_t> inline Number_t from_bin(std::string str, std::string *err) {
+    static_assert((std::is_arithmetic<Number_t>::value || std::is_pointer<Number_t>::value) &&
+                      sizeof(Number_t) <= 8,
+                  "Cannot convert binary to type");
+
+    if (err)
+        err->clear();
+
+    JStrings::strip(&str, JStrings::Right);
+ 
+    // I'll allow 0b1001_1011
+    if (!JStrings::contains_only(str, "b0_1")) {
+        if (err)
+            *err = "Binary numbers can only have 0,1";
+        return Number_t{};
+    }
+
+    // need to operate on a data type that supports bit operations
+    uint64_t data = 0;
+    Number_t val{};
+
+    // LSB is at the end of the string
+    int iStr = str.length() - 1;
+
+    //
+    // Move through the digits in the string, setting the 
+    // corresponding bit in the number
+    //
+    for (size_t iBit = 0; iBit < sizeof(val) * 8 && iStr >= 0; iStr--) {
+
+        if (str[iStr] == '_') {
+            continue;
+        } else if (str[iStr] == 'b') {
+            break;
+        } else {
+            data |= ((str[iStr] == '1') << iBit);
+            iBit++;
+        }
+    }
+
+    // cram the bits into whatever numeric type
+    memcpy(&val, &data, sizeof(val));
+    return val;
 }
 
 } // namespace JStrings

@@ -247,7 +247,7 @@ class ObjectFrame:
             if v.ctype not in ctype_fmts:
                 continue
 
-            var_name:str = f'{self.combo_name+"." if self.combo_name else ""}{v.name}'
+            var_name:str = f'{self.combo_name + ("." if self.combo_name else "")}{v.name}'
             print(var_name)
 
             _, printf, stonum = ctype_fmts[v.ctype]
@@ -266,7 +266,7 @@ class ObjectFrame:
             _, printf, stonum = ctype_fmts[b.ctype]
             printf = printf.replace("0","")
             for var_name, _ in b.fields:
-                var_name = f'{self.combo_name+"." if self.combo_name else ""}{var_name}'
+                var_name = f'{self.combo_name+ ("." if self.combo_name else "")}{var_name}'
                 print(var_name)
                 macros.append(f'REGISTER_BITFIELD({base_name}, {var_name}, {b.ctype}, "{printf}", {stonum});')
 

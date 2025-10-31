@@ -6,7 +6,7 @@ namespace js = JStrings;
 #define TEST(a, b)                                                                                 \
     do {                                                                                           \
         if (a != b) {                                                                              \
-            std::cout << "Failed " #a " got:" << a << "\n";                                        \
+            std::cout << "Failed " #a " got: " << a << "\n";                                       \
         }                                                                                          \
     } while (0);
 
@@ -43,8 +43,14 @@ int main() {
 
     TEST(js::remove(ex, "le "), "ExampText");
 
+    TEST(js::contains_only("0b0110011010", "b01"), true);
+
     std::string split_test = "ex ex  ex ";
     auto split_ret = js::split(split_test, "x", JStrings::TrimAll);
 
-    std::cout << js::as_bin(&ex) << "\n";
+    std::string err;
+    short x = js::from_bin<short>("0b11000_0000_0000_0001", &err);
+    float f = js::from_bin<float>("0b1000_0000_0000_1000_0000_0000_1000_0000_0000_0001", &err);
+    std::cout << x << "\n";
+    std::cout << f << "\n";
 }
