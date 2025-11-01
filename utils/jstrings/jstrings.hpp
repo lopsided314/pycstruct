@@ -85,6 +85,12 @@ inline bool contains_only(const std::string &str, std::string chars) {
 
 /*===========================================================================*/
 
+inline bool isspace(const std::string &str) {
+    return std::all_of(str.begin(), str.end(), ::isspace);
+}
+
+/*===========================================================================*/
+
 inline size_t count(const std::string &str, std::string key) {
     size_t start = 0, stop = 0, count = 0;
     while ((start = str.find(key, stop)) != std::string::npos) {
@@ -337,10 +343,19 @@ inline std::string remove(std::string str, std::string key, int rb = All) {
 
 /*===========================================================================*/
 
-enum SplitBehavior : int { None = 0, SkipEmpty = 1, TrimAll = 2 };
+enum SplitBehavior : int { None = 0, SkipEmpty = 1, TrimAll = 2, SkipWhiteSpace = 4 };
 
 inline JStringList split(std::string str, std::string key, int sb = None) {
     if (str.find(key) == std::string::npos) {
+        if (sb & TrimAll) {
+            JStrings::strip(&str);
+        }
+        if (sb & SkipEmpty && str.length() == 0) {
+            return {};
+        }
+        if (sb & SkipWhiteSpace && JStrings::isspace(str)) {
+            return {};
+        }
         return {str};
     }
 
@@ -367,9 +382,11 @@ inline JStringList split(std::string str, std::string key, int sb = None) {
         }
     }
     if (sb & SkipEmpty) {
-        strs.erase(std::remove_if(strs.begin(), strs.end(),
-                                  [](const std::string &s) { return s.length() == 0; }),
-                   strs.end());
+        auto is_empty = [](const std::string &str) -> bool { return str.length() == 0; };
+        strs.erase(std::remove_if(strs.begin(), strs.end(), is_empty), strs.end());
+    }
+    if (sb & SkipWhiteSpace) {
+        strs.erase(std::remove_if(strs.begin(), strs.end(), JStrings::isspace), strs.end());
     }
 
     return strs;
@@ -492,7 +509,7 @@ inline long stol(std::string str, std::string *err = nullptr) {
 /*===========================================================================*/
 
 //
-// wrapper for std::stod but with better errors and no exceptions. Also 
+// wrapper for std::stod but with better errors and no exceptions. Also
 // supports scientific notation, e.g. 2.998e8 or 1.38e-23
 //
 inline double stod(std::string str, std::string *err = nullptr) {
@@ -563,12 +580,12 @@ template <typename Number_t> inline std::string as_bin(Number_t val) {
     static_assert((std::is_arithmetic<Number_t>::value || std::is_pointer<Number_t>::value) &&
                       sizeof(Number_t) <= 8,
                   "Cannot print type as binary");
-    
+
     // Put the bits into a data type that supports bit operations.
     uint64_t data = 0;
     memcpy(&data, &val, sizeof(val));
 
-    // Move through the bits of the data and set the character in the 
+    // Move through the bits of the data and set the character in the
     // corresponding index of the string. Inserts visual spacers at
     // set intervals.
     //
@@ -576,7 +593,7 @@ template <typename Number_t> inline std::string as_bin(Number_t val) {
 
     char str[100] = {0};
     size_t spacer_spacing = 4;
-     
+
     // starting index in string
     // (# of bits) + (# of spacers) - (offset due to indexing from 0)
     int iStr = (sizeof(val) * 8) + (sizeof(val) * 8 / spacer_spacing - 1) - 1;
@@ -603,7 +620,7 @@ template <typename Number_t> inline Number_t from_bin(std::string str, std::stri
         err->clear();
 
     JStrings::strip(&str, JStrings::Right);
- 
+
     // I'll allow 0b1001_1011
     if (!JStrings::contains_only(str, "b0_1")) {
         if (err)
@@ -619,7 +636,7 @@ template <typename Number_t> inline Number_t from_bin(std::string str, std::stri
     int iStr = str.length() - 1;
 
     //
-    // Move through the digits in the string, setting the 
+    // Move through the digits in the string, setting the
     // corresponding bit in the number
     //
     for (size_t iBit = 0; iBit < sizeof(val) * 8 && iStr >= 0; iStr--) {

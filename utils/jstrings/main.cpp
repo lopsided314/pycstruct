@@ -49,8 +49,9 @@ int main() {
     auto split_ret = js::split(split_test, "x", JStrings::TrimAll);
 
     std::string err;
-    short x = js::from_bin<short>("0b11000_0000_0000_0001", &err);
-    float f = js::from_bin<float>("0b1000_0000_0000_1000_0000_0000_1000_0000_0000_0001", &err);
+    short x = js::from_bin<short>("0b000000000000000011", &err);
     std::cout << x << "\n";
-    std::cout << f << "\n";
+
+    TEST(js::isspace("\t  \n"), true);
+
 }
