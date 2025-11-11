@@ -44,14 +44,21 @@ int main() {
     TEST(js::remove(ex, "le "), "ExampText");
 
     TEST(js::contains_only("0b0110011010", "b01"), true);
+    TEST(js::isspace("\t  \n"), true);
 
     std::string split_test = "ex ex  ex ";
-    auto split_ret = js::split(split_test, "x", JStrings::TrimAll);
+    auto split_ret = js::split(split_test, "x", JStrings::TrimAll, 0);
+     // split_ret = js::split(split_test, "", JStrings::TrimAll, 3);
+    std::cout << js::join(split_ret, "\n", "\"", "\"") << "\n";
+    
 
     std::string err;
-    short x = js::from_bin<short>("0b000000000000000011", &err);
-    std::cout << x << "\n";
+    // short x = js::from_bin<short>("0b000000000000000011", &err);
+    // std::cout << x << "\n";
 
-    TEST(js::isspace("\t  \n"), true);
+    js::stoul_0x("0x123k", &err);
+    if (err.length() > 0) {
+        std::cout << err << "\n";
+    }
 
 }

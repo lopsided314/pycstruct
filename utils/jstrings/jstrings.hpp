@@ -3,7 +3,7 @@
 
 #include <algorithm> // transform, find_if, remove_if
 #include <cassert>
-#include <cstdarg> // sprintf
+#include <cstdarg> // fmt
 #include <cstdint>
 #include <deque>     // jstringlist
 #include <stdexcept> // invlaid_argument, out_of_range
@@ -18,7 +18,7 @@ namespace JStrings {
 /*===========================================================================*/
 
 // Same thing as sprintf but with std::strings
-inline std::string sprintf(std::string fmt, ...) {
+inline std::string fmt(std::string fmt, ...) {
     char buf[2000] = {0};
     va_list args;
     va_start(args, fmt);
@@ -85,9 +85,23 @@ inline bool contains_only(const std::string &str, std::string chars) {
 
 /*===========================================================================*/
 
-inline bool isspace(const std::string &str) {
-    return std::all_of(str.begin(), str.end(), ::isspace);
+using _glibc_str_func = int(*)(int);
+inline bool _glibc_ext(const std::string &str, _glibc_str_func func) {
+    return std::all_of(str.begin(), str.end(), func);
 }
+inline bool isalnum(const std::string &str) { return _glibc_ext(str, ::isalnum); }
+inline bool isalpha(const std::string &str) { return _glibc_ext(str, ::isalpha); }
+inline bool iscntrl(const std::string &str) { return _glibc_ext(str, ::iscntrl); }
+inline bool isdigit(const std::string &str) { return _glibc_ext(str, ::isdigit); }
+inline bool isgraph(const std::string &str) { return _glibc_ext(str, ::isgraph); }
+inline bool islower(const std::string &str) { return _glibc_ext(str, ::islower); }
+inline bool isprint(const std::string &str) { return _glibc_ext(str, ::isprint); }
+inline bool ispunct(const std::string &str) { return _glibc_ext(str, ::ispunct); }
+inline bool isspace(const std::string &str) { return _glibc_ext(str, ::isspace); }
+inline bool isupper(const std::string &str) { return _glibc_ext(str, ::isupper); }
+inline bool isxdigit(const std::string &str) { return _glibc_ext(str, ::isxdigit); }
+inline bool isascii(const std::string &str) { return _glibc_ext(str, ::isascii); }
+inline bool isblank(const std::string &str) { return _glibc_ext(str, ::isblank); }
 
 /*===========================================================================*/
 
@@ -140,7 +154,7 @@ inline void left_pad(std::string *str, size_t new_size, char pad_char = ' ') {
         return;
     }
 
-    if (!isgraph(pad_char))
+    if (!::isgraph(pad_char))
         pad_char = ' ';
 
     *str = std::string(new_size - str->length(), pad_char) + *str;
@@ -159,7 +173,7 @@ inline void right_pad(std::string *str, size_t new_size, char pad_char = ' ') {
         return;
     }
 
-    if (!isgraph(pad_char))
+    if (!::isgraph(pad_char))
         pad_char = ' ';
 
     *str += std::string(new_size - str->length(), pad_char);
@@ -177,7 +191,7 @@ inline void center_pad(std::string *str, size_t new_size, char pad_char = ' ') {
     if (str->length() >= new_size)
         return;
 
-    if (!isgraph(pad_char))
+    if (!::isgraph(pad_char))
         pad_char = ' ';
 
     size_t pad_length = new_size - str->length();
@@ -199,18 +213,18 @@ inline std::string center_pad(std::string str, int new_size, char pad_char = ' '
 
 enum StripBehavior : int { Left = 1, Right = 2, Both = Left | Right };
 
-inline void strip(std::string *str, std::string char_set, StripBehavior sb = Both) {
+inline void strip(std::string *str, const std::string& char_set, StripBehavior sb = Both) {
     assert(str != nullptr);
 
-    auto chars_contain = [char_set](char c) -> bool {
+    auto not_in_chars = [char_set](char c) -> bool {
         return char_set.find(c) == std::string::npos;
     };
 
     if (sb & Left) {
-        str->erase(str->begin(), std::find_if(str->begin(), str->end(), chars_contain));
+        str->erase(str->begin(), std::find_if(str->begin(), str->end(), not_in_chars));
     }
     if (sb & Right) {
-        str->erase(std::find_if(str->rbegin(), str->rend(), chars_contain).base(), str->end());
+        str->erase(std::find_if(str->rbegin(), str->rend(), not_in_chars).base(), str->end());
     }
 }
 inline std::string strip(std::string str, std::string char_set, StripBehavior sb = Both) {
@@ -345,8 +359,8 @@ inline std::string remove(std::string str, std::string key, int rb = All) {
 
 enum SplitBehavior : int { None = 0, SkipEmpty = 1, TrimAll = 2, SkipWhiteSpace = 4 };
 
-inline JStringList split(std::string str, std::string key, int sb = None) {
-    if (str.find(key) == std::string::npos) {
+inline JStringList split(std::string str, std::string key, int sb = None, int maxsplit = -1) {
+    if (str.find(key) == std::string::npos || maxsplit == 0) {
         if (sb & TrimAll) {
             JStrings::strip(&str);
         }
@@ -360,10 +374,17 @@ inline JStringList split(std::string str, std::string key, int sb = None) {
     }
 
     JStringList strs;
+    if (maxsplit < 0) {
+        maxsplit = INT32_MAX;
+    }
 
     if (key.length() == 0) {
-        for (char c : str) {
-            strs.push_back({c});
+        int i;
+        for (i = 0; i < maxsplit && i < (int)str.length(); i++) {
+            strs.push_back({str[i]});
+        }
+        if (i < (int)str.length() - 1) {
+            strs.push_back(str.substr(i, std::string::npos));
         }
         return strs;
     }
@@ -373,6 +394,10 @@ inline JStringList split(std::string str, std::string key, int sb = None) {
     while ((start = str.find(key, stop)) != std::string::npos) {
         strs.push_back(str.substr(stop, start - stop));
         stop = start + key.length();
+
+        if (--maxsplit <= 0) {
+            break;
+        }
     }
     strs.push_back(str.substr(stop, std::string::npos));
 
@@ -446,8 +471,11 @@ inline JStringList combine_lists(const JStringList &list1, const JStringList &li
 // wrapper for std::stoul(..., 16) but with better errors and no exceptions
 //
 inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
-    if (err)
-        err->clear();
+
+    auto set_err = [str, err](const char *exception) -> void {
+        if (err)
+            *err = "stoul_0x(\"" + str + "\"): " + exception;
+    };
 
     unsigned long val = 0;
     size_t idx = 0;
@@ -455,21 +483,20 @@ inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
     try {
         val = std::stoul(str, &idx, 16);
     } catch (const std::invalid_argument &) {
-        if (err)
-            *err = "stoul_0x(\"" + str + "\"): invalid_argument";
+        set_err("invalid_argument");
         return val;
     } catch (const std::out_of_range &) {
-        if (err)
-            *err = "stoul_0x(\"" + str + "\"): out_of_range";
+        set_err("out_of_range");
         return val;
     }
 
     if (idx != str.length()) {
-        if (err)
-            *err = "stoul_0x(\"" + str + "\"): invalid_argument";
+        set_err("invalid_argument");
         return val;
     }
 
+    if (err)
+        err->clear();
     return val;
 }
 
@@ -479,8 +506,11 @@ inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
 // wrapper for std::stol but with better errors and no exceptions
 //
 inline long stol(std::string str, std::string *err = nullptr) {
-    if (err)
-        err->clear();
+
+    auto set_err = [str, err](const char *exception) -> void {
+        if (err)
+            *err = "stol(\"" + str + "\"): " + exception;
+    };
 
     long val = 0;
     size_t idx = 0;
@@ -488,20 +518,20 @@ inline long stol(std::string str, std::string *err = nullptr) {
     try {
         val = std::stol(str, &idx);
     } catch (const std::invalid_argument &) {
-        if (err)
-            *err = "stol(\"" + str + "\"): invalid_argument";
+        set_err("invalid_argument");
         return val;
     } catch (const std::out_of_range &) {
-        if (err)
-            *err = "stol(\"" + str + "\"): out_of_range";
+        set_err("out_of_range");
         return val;
     }
 
     if (idx != str.length()) {
-        if (err)
-            *err = "stol(\"" + str + "\"): invalid_argument";
+        set_err("invalid_argument");
         return val;
     }
+
+    if (err)
+        err->clear();
 
     return val;
 }
@@ -514,8 +544,10 @@ inline long stol(std::string str, std::string *err = nullptr) {
 //
 inline double stod(std::string str, std::string *err = nullptr) {
 
-    if (err)
-        err->clear();
+    auto set_err = [str, err](const char *exception) -> void {
+        if (err)
+            *err = "stod(\"" + str + "\"): " + exception;
+    };
 
     double val = 0;
     int exponent = 0;
@@ -526,47 +558,44 @@ inline double stod(std::string str, std::string *err = nullptr) {
         if (JStrings::contains(str, "e")) {
             JStringList spl = JStrings::split(str, "e", TrimAll);
             if (spl.size() != 2) {
-                if (err)
-                    *err = "stod(\"" + str + "\"): invalid_argument";
+                set_err("invalid_argument");
                 return val;
             }
 
             val = std::stod(spl[0], &idx);
             if (idx != spl[0].length()) {
-                if (err)
-                    *err = "stod(\"" + str + "\"): invalid_argument";
+                set_err("invalid_argument");
                 return val;
             }
 
             exponent = std::stol(spl[1], &idx);
             if (idx != spl[1].length()) {
-                if (err)
-                    *err = "stod(\"" + str + "\"): invalid_arguemnt";
+                set_err("invalid_argument");
                 return val;
             }
             double e = exponent > 0 ? 10 : .1;
             exponent = abs(exponent);
 
-            while (exponent --> 0) {
+            while (exponent-- > 0) {
                 val *= e;
             }
         } else {
             val = std::stod(str, &idx);
             if (idx != str.length()) {
-                if (err)
-                    *err = "stod(\"" + str + "\"): invalid_argument";
+                set_err("invalid_argument");
                 return val;
             }
         }
     } catch (const std::invalid_argument &) {
-        if (err)
-            *err = "stod(\"" + str + "\"): invalid_argument";
+        set_err("invalid_argument");
         return val;
     } catch (const std::out_of_range &) {
-        if (err)
-            *err = "stod(\"" + str + "\"): out_of_range";
+        set_err("out_of_range");
         return val;
     }
+
+    if (err)
+        err->clear();
 
     return val;
 }
