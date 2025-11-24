@@ -1,13 +1,11 @@
-"""Cascaded RF Signal Chain Computations.
+"""Library that allows for power and noise calculations for an
+RF signal chain.
 
-This module contains functionality to facilitate computing the cascaded gain
-and noise figure of RF signal chains. The
 """
 
+import os, sys
 from copy import deepcopy
 from math import log10, prod
-from os.path import abspath
-from sys import stdout
 from typing import Sequence, TextIO
 
 #
@@ -31,9 +29,19 @@ def dB(x: float) -> float:
     return 10 * log10(x)
 
 
+def sdB(x: float) -> str:
+    """Turn x into a formatted string of decibels."""
+    return f72(dB(x))
+
+
 def dBm(x: float) -> float:
     """Turn x into dBm."""
     return 10 * log10(x) + 30
+
+
+def sdBm(x: float) -> str:
+    """Turn x into a formatted string of dBm."""
+    return f72(dBm(x))
 
 
 def undB(x: float) -> float:
@@ -57,9 +65,7 @@ def mismatch_loss_dB(VSWR: float) -> float:
     return dB(1 - refl_coeff**2)
 
 
-#
-# cascaded gain and noise figure computation
-#
+"""Cascaded Noise figure computation."""
 
 
 class NoiseFigureStage:
@@ -78,33 +84,6 @@ class NoiseFigureStage:
         return self.G > 0 and self.F > 1
 
 
-# def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[float, float]:
-#     """Compute the Gain and Noise figure of ordered stages.
-#
-#     Args:
-#         stages: ordered sequence of stages that define a gain and noise figure.
-#
-#     Returns:
-#         (G, F): Total Gain and Noise Figure of the sequence (both linear)
-#             G = G1*G2*...*Gn
-#             F = F1 + (F2 - 1)/G1 + (F3  -1)/(G1*G2) + ... + (Fn - 1)/(G1*G2*...*Gn-1)
-#     """
-#     assert len(stages) > 0
-#
-#     # G1, G1*G2, G1*G2*...*Gn
-#     Gees: list[float] = [s.G for s in stages]
-#     Gees = [prod(Gees[: i + 1]) for i in range(len(Gees))]
-#
-#     Effs: list[float] = [s.F for s in stages]
-#     F: float = Effs[0]
-#
-#     for g, f in zip(Gees[:-1], Effs[1:]):
-#         F += (f - 1) / g
-#
-#     return Gees[-1], F
-#
-
-
 def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[list[float], list[float]]:
     """Compute the Gain and Noise figure of ordered stages.
 
@@ -113,15 +92,24 @@ def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[list[float], list[f
 
     Returns:
         (G, F): Total Gain and Noise Figure of the sequence (both linear)
-            G = G1*G2*...*Gn
-            F = F1 + (F2 - 1)/G1 + (F3  -1)/(G1*G2) + ... + (Fn - 1)/(G1*G2*...*Gn-1)
+            G = [G1,
+                 G1*G2,
+                 G1*G2*G3,
+                 ...
+                 G1*G2*...*Gn]
+            F = [F1,
+                 F1 + (F2 - 1)/G1,
+                 F1 + (F2 - 1)/G1 + (F3  -1)/(G1*G2),
+                 F1 + (F2 - 1)/G1 + (F3  -1)/(G1*G2) + ... + (Fn - 1)/(G1*G2*...*Gn-1)]
     """
-    assert len(stages) > 0
+    if len(stages) == 0:
+        raise ValueError("Calculations require one or more stages")
+    if not all(s.valid() for s in stages):
+        raise ValueError("Stage has invalid or uninitialized parameters")
 
     Gees: list[float] = [s.G for s in stages]
     Effs: list[float] = [s.F for s in stages]
 
-    # G1, G1*G2, G1*G2*...*Gn
     G_accum: list[float] = [prod(Gees[: i + 1]) for i in range(len(Gees))]
 
     F_accum: list[float] = [Effs[0]]
@@ -132,7 +120,16 @@ def cascade_G_F(stages: Sequence[NoiseFigureStage]) -> tuple[list[float], list[f
     return G_accum, F_accum
 
 
-class Component(NoiseFigureStage):
+#
+# initialization values for dB units that don't
+# cause arithmetic errors when converting back
+# to printable values
+#
+DB_INIT = undB(-999.99)
+DBM_INIT = undBm(-999.99)
+
+
+class RFComponent(NoiseFigureStage):
     """Model for an RF Component inside a signal chain.
 
     Create component with RF parameters and computes the components ouput
@@ -149,13 +146,13 @@ class Component(NoiseFigureStage):
         self.VSWR: float = VSWR
         self.desc: str = desc
 
-        self.Si: float = 0
-        self.So: float = 0
+        self.Si: float = DBM_INIT
+        self.So: float = DBM_INIT
         self.Si_warn: float = undBm(Pin_warn_dBm)
-        self.Ni: float = 0
-        self.No: float = 0
-        self.SNR_i: float = 0
-        self.SNR_o: float = 0
+        self.Ni: float = DBM_INIT
+        self.No: float = DBM_INIT
+        self.SNR_i: float = DB_INIT
+        self.SNR_o: float = DB_INIT
 
         self.warning: str = ""
 
@@ -167,7 +164,7 @@ class Component(NoiseFigureStage):
         # signal
         self.So = self.Si * self.G
 
-        self.warning = ""  # need to reset each time
+        self.warning = ""
         if self.Si > self.Si_warn:
             if self.G > 1:
                 self.warning = f"'{self.desc}' output too high: {dBm(self.So):.1f}, {dBm(self.Si_warn * self.G):.1f}"
@@ -190,9 +187,9 @@ def Amp(
     VSWR: float = 1,
     OP1dB_dBm: float = 999,
     desc: str = "",
-) -> Component:
+) -> RFComponent:
     """Generate a component representing typical amplifier parameters."""
-    return Component(gain_dB, NF_dB, VSWR, OP1dB_dBm - gain_dB, desc)
+    return RFComponent(gain_dB, NF_dB, VSWR, OP1dB_dBm - gain_dB, desc)
 
 
 def Mixer(
@@ -201,53 +198,48 @@ def Mixer(
     VSWR: float = 1,
     IP1dB_dBm: float = 999,
     desc: str = "",
-) -> Component:
+) -> RFComponent:
     """Generate a component representing typical mixer parameters."""
-    return Component(-loss_dB, NF_dB, VSWR, IP1dB_dBm, desc)
+    return RFComponent(-loss_dB, NF_dB, VSWR, IP1dB_dBm, desc)
 
 
 def Loss(
     loss_dB: float, VSWR: float = 1, Pin_warn_dBm: float = 999, desc: str = ""
-) -> Component:
+) -> RFComponent:
     """Generate a component representing generic loss parameters."""
-    return Component(-loss_dB, loss_dB, VSWR, Pin_warn_dBm, desc)
+    return RFComponent(-loss_dB, loss_dB, VSWR, Pin_warn_dBm, desc)
 
 
-def AttnPad(loss_dB: float) -> Component:
+def AttnPad(loss_dB: float) -> RFComponent:
     """Generate a component representing an attenuator pad."""
-    return Component(-loss_dB, loss_dB, 1, 999, f"{loss_dB:.0f} dB pad")
+    return RFComponent(-loss_dB, loss_dB, 1, 999, f"{loss_dB:.0f} dB pad")
 
 
-#
-# RF Signal chain sections
-#
-
-
-class Section(NoiseFigureStage):
+class ComponentChain(NoiseFigureStage):
     """Container of RF Components.
 
     Hold ordered sequence of components and compute their cascaded
     gain and noise figure.
     """
 
-    def __init__(self, components: Sequence[Component], desc: str) -> None:
+    def __init__(self, components: Sequence[RFComponent], desc: str) -> None:
         super().__init__()
         if len(components) == 0:
-            raise ValueError("Cannot have section with no components")
+            raise ValueError("Cannot have component chain with no components")
 
-        self.components: list[Component] = list(deepcopy(components))
+        self.components: list[RFComponent] = list(deepcopy(components))
         self.desc: str = desc
 
         self.G_accum, self.F_accum = cascade_G_F(self.components)
         self.G, self.F = self.G_accum[-1], self.F_accum[-1]
-        # self.Te = Te(self.F)
+        self.Te = Te(self.F)
 
-        self.Si: float = 0
-        self.So: float = 0
-        self.Ni: float = 0
-        self.No: float = 0
-        self.SNR_i: float = 0
-        self.SNR_o: float = 0
+        self.Si: float = DBM_INIT
+        self.So: float = DBM_INIT
+        self.Ni: float = DBM_INIT
+        self.No: float = DBM_INIT
+        self.SNR_i: float = DB_INIT
+        self.SNR_o: float = DB_INIT
 
         self.warnings: list[str] = []
 
@@ -271,45 +263,23 @@ class Section(NoiseFigureStage):
         """Printable output."""
         first, last = self.components[0], self.components[-1]
         ret = f"'{self.desc}' totals:\n"
-        ret += f"  G     = {f72(dB(self.G))} dB\n"
-        ret += f"  NF    = {f72(dB(self.F))} dB\n"
-        ret += f"  Si    = {f72(dBm(first.Si))} dBm\n"
-        ret += f"  So    = {f72(dBm(last.So))} dBm\n"
-        ret += f"  Ni    = {f72(dBm(first.Ni))} dBm/Hz\n"
-        ret += f"  No    = {f72(dBm(last.No))} dBm/Hz\n"
-        ret += f"  SNR_i = {f72(dB(first.SNR_i))} dB\n"
-        ret += f"  SNR_o = {f72(dB(last.SNR_o))} dB\n"
+        ret += f"  G     = {sdB(self.G)} dB\n"
+        ret += f"  NF    = {sdB(self.F)} dB\n"
+        ret += f"  Si    = {sdBm(first.Si)} dBm\n"
+        ret += f"  So    = {sdBm(last.So)} dBm\n"
+        ret += f"  Ni    = {sdBm(first.Ni)} dBm/Hz\n"
+        ret += f"  No    = {sdBm(last.No)} dBm/Hz\n"
+        ret += f"  SNR_i = {sdB(first.SNR_i)} dB\n"
+        ret += f"  SNR_o = {sdB(last.SNR_o)} dB\n"
         if self.warnings:
-            ret += (
-                "\n".join("  Warning: " + warning for warning in self.warnings) + "\n"
-            )
+            ret += "\n".join("  Warning: " + w for w in self.warnings) + "\n"
         return ret
 
-    def param_strs(self, SNR_0: float) -> dict[str, str]:
-        """Return the section parameters as formatted strings."""
-        first, last = self.components[0], self.components[-1]
-        ret = {
-            "Name": f"{self.desc}",
-            "G": f"{f72(dB(self.G))}",
-            "NF": f"{f72(dB(self.F))}",
-            "Si": f"{f72(dBm(first.Si))}",
-            "So": f"{f72(dBm(last.So))}",
-            "Ni": f"{f72(dBm(first.Ni))}",
-            "No": f"{f72(dBm(last.No))}",
-            "SNR_i": f"{f72(dB(first.SNR_i))}",
-            "SNR_o": f"{f72(dB(last.SNR_o))}",
-            "SNR_loss": f"{f72(dB(SNR_0/last.SNR_o))}",
-        }
-        # normalize the length of every entry for this section so
-        # the spacing works out when printing the inline thing
-        vl = max(len(val) for val in ret.values())
-        return {key: val.rjust(vl) for key, val in ret.items()}
 
-
-class Coax(Section):
+class Coax(ComponentChain):
     """Cable loss as a signal chain section.
 
-    Overload of signal chain section so cable loss can easily
+    Overload of so cable loss can easily
     be integrated into model.
     """
 
@@ -326,7 +296,7 @@ class Coax(Section):
 
 
 def analyze_sections(
-    sections: Sequence[Section], Pin_dBm: float, BW_MHz: float, **kwargs
+    sections: Sequence[ComponentChain], Pin_dBm: float, BW_MHz: float, **kwargs
 ) -> None:
     """
     Perform cascade analysis on signal chain sections.
@@ -341,18 +311,17 @@ def analyze_sections(
 
         file (TextIO | str): Redirect script output to a file / filename.
     """
+    file: TextIO = sys.stdout
     if "file" in kwargs:
-        if isinstance(kwargs["file"], TextIO) and kwargs["file"] != stdout:
+        if isinstance(kwargs["file"], TextIO) and kwargs["file"] != sys.stdout:
             file = kwargs["file"]
             if file.closed:
                 file = open(file.name, "w")
         elif isinstance(kwargs["file"], str):
-            output_file = abspath(kwargs["file"])
+            output_file = os.path.abspath(kwargs["file"])
             file = open(output_file, "w")
         else:
             raise TypeError("Ouput file invalid type")
-    else:
-        file: TextIO = stdout
 
     # less typing
     fprint = lambda s: print(s, file=file)
@@ -369,26 +338,25 @@ def analyze_sections(
         case {"Ni_dBm": Ni_dBm}:
             Ni = undBm(Ni_dBm) / BW
             if Ni < k * T0:
-                Ni = k * T0
                 fprint(
-                    f"WARNING: Requested noise power requires noise density below thermal; setting to default Ni = {f72(dBm(Ni))} dBm/Hz"
+                    f"WARNING: Requested noise power requires noise density below thermal ({sdBm(Ni)} dBm/Hz)"
                 )
         case {"Tin": Tin}:
             Ni = k * Tin
         case {"SNR": SNR_in}:
             Ni = undBm(Pin_dBm - SNR_in) / BW
             if Ni < k * T0:
-                Ni = k * T0
                 fprint(
-                    f"WARNING: Requested SNR requires noise density below thermal; setting to default Ni = {f72(dBm(Ni))} dBm/Hz"
+                    f"WARNING: Requested SNR requires noise density below thermal ({sdBm(Ni)} dBm/Hz)"
                 )
         case _:
             Ni = k * T0
-            fprint(f"Default Ni = {f72(dBm(Ni))} dBm/Hz")
+            fprint(f"Default Ni = {sdBm(Ni)} dBm/Hz\n")
 
     #
     # calculations
     #
+    sections = deepcopy(sections)
 
     # run calculations for individual stages
     sections[0].set_input(Si, Ni, BW)
@@ -403,63 +371,111 @@ def analyze_sections(
     #
     start, end = sections[0], sections[-1]
 
-    # printing individual stages
-    PARAM_NAME_WIDTH = 9
-    inline_lines: dict[str, list[str]] = {}
-    for section, Gcas, Fcas in zip(sections, Gees, Effs):
+    for section in sections:
         fprint(section)
-        section_width: int = 0
-        for param, val in section.param_strs(start.Si / (start.Ni * BW)).items():
-            section_width = len(val)
-            if param not in inline_lines:
-                inline_lines[param] = [param.ljust(PARAM_NAME_WIDTH)]
-            inline_lines[param].append(val)
 
-        if "G total" not in inline_lines:
-            inline_lines["G total"] = ["G total".ljust(PARAM_NAME_WIDTH)]
-        if "NF total" not in inline_lines:
-            inline_lines["NF total"] = ["NF total".ljust(PARAM_NAME_WIDTH)]
-
-        inline_lines["G total"].append(f72(dB(Gcas)).rjust(section_width))
-        inline_lines["NF total"].append(f72(dB(Fcas)).rjust(section_width))
-
-    for line in inline_lines.values():
-        fprint("| " + " | ".join(line) + " |")
+    fprint(_generate_inline_text(sections, Gees, Effs))
 
     # print system totals
     fprint("")
     fprint("System Totals:")
-    fprint(f"  G     = {f72(dB(Gees[-1]))} dB")
-    fprint(f"  NF    = {f72(dB(Effs[-1]))} dB")
-    fprint(f"  Si    = {f72(dBm(start.Si))} dBm")
-    fprint(f"  So    = {f72(dBm(end.So))} dBm")
-    fprint(
-        f"  Ni    = {f72(dBm(start.Ni))} dBm/Hz ({f72(dBm(start.Ni * BW))} dBm/{BW_MHz} MHz)"
-    )
-    fprint(
-        f"  No    = {f72(dBm(end.No))} dBm/Hz ({f72(dBm(end.No * BW))} dBm/{BW_MHz} MHz)"
-    )
-    fprint(f"  SNR_i = {f72(dB(start.Si/(start.Ni * BW)))} dB ({BW_MHz} MHz)")
-    fprint(f"  SNR_o = {f72(dB(end.So/(end.No * BW)))} dB ({BW_MHz} MHz)")
+    fprint(f"  G    = {sdB(Gees[-1])} dB")
+    fprint(f"  NF   = {sdB(Effs[-1])} dB")
+    fprint(f"  Si   = {sdBm(start.Si)} dBm")
+    fprint(f"  So   = {sdBm(end.So)} dBm")
+    fprint(f"  Ni   = {sdBm(start.Ni)} dBm/Hz ({sdBm(start.Ni * BW)} dBm/{BW_MHz} MHz)")
+    fprint(f"  No   = {sdBm(end.No)} dBm/Hz ({sdBm(end.No * BW)} dBm/{BW_MHz} MHz)")
+    fprint(f"  SNR_i = {sdB(start.Si/(start.Ni * BW))} dB ({BW_MHz} MHz)")
+    fprint(f"  SNR_o = {sdB(end.So/(end.No * BW))} dB ({BW_MHz} MHz)")
 
-    if file != stdout:
+    if file != sys.stdout:
         file.close()
+
+
+def _generate_inline_text(
+    sections: Sequence[ComponentChain], Gees: list[float], Effs: list[float]
+) -> str:
+    """Format stuff into lines"""
+
+    stage_params: dict[str, list[str]] = {
+        "Name": [],
+        "G": [],
+        "NF": [],
+        "Si": [],
+        "So": [],
+        "Ni": [],
+        "No": [],
+        "SNRi": [],
+        "SNRo": [],
+        "SNR loss": [],
+    }
+
+    accum_params: dict[str, list[str]] = {
+        "G tot": [],
+        "NF tot": [],
+        "SNR loss": [],
+    }
+
+    # figure out the longest parameter name
+    width: int = max(
+        max(len(k) for k in stage_params.keys()),
+        max(len(k) for k in accum_params.keys()),
+    )
+
+    # make each line start with its paramater, padded to the correct length
+    stage_params = {s: [s.ljust(width)] for s in stage_params.keys()}
+    accum_params = {s: [s.ljust(width)] for s in accum_params.keys()}
+
+    # more functions to make string formatting shorter
+    # right-justified string decibels
+    rsdB = lambda x: sdB(x).rjust(width)
+    rsdBm = lambda x: sdBm(x).rjust(width)
+
+    for section, G, F in zip(sections, Gees, Effs):
+        width = max(len(section.desc), len(sdB(1)))
+
+        stage_params["Name"].append(section.desc.rjust(width))
+        stage_params["G"].append(rsdB(section.G))
+        stage_params["NF"].append(rsdB(section.F))
+        # stage_params["Si"].append(lsdBm(section.Si))
+        stage_params["So"].append(rsdBm(section.So))
+        # stage_params["Ni"].append(lsdBm(section.Ni))
+        stage_params["No"].append(rsdBm(section.No))
+        # stage_params["SNRi"].append(lsdBm(section.SNR_i))
+        # stage_params["SNRo"].append(lsdB(section.SNR_o))
+        # stage_params["SNR loss"].append(rsdB(section.SNR_i / section.SNR_o))
+
+        accum_params["G tot"].append(rsdB(G))
+        accum_params["NF tot"].append(rsdB(F))
+        accum_params["SNR loss"].append(rsdB(sections[0].SNR_i / section.SNR_o))
+
+    lines: list[str] = []
+    for param_list in stage_params.values():
+        if len(param_list) > 1:
+            lines.append("| " + " | ".join(param_list) + " |")
+
+    lines.append("-" * len(lines[-1]))
+
+    for param_list in accum_params.values():
+        if len(param_list) > 1:
+            lines.append("| " + " | ".join(param_list) + " |")
+
+    return "\n".join(lines)
 
 
 def example() -> None:
     """Example 10.2 in Pozar's Microwave Engineering, 4e."""
 
     # make a list of one or more components
-    components: list[Component] = [
+    components: list[RFComponent] = [
         Amp(10, 2, OP1dB_dBm=0, desc="lna"),
         Loss(1, desc="bpf"),
         Mixer(3, 4, desc="mixer"),
     ]
 
     # make a list of one or more sections
-    sections: list[Section] = [
-        Section(desc="Example 10.2", components=components),
-        Section(desc="Example 10.2", components=components),
+    sections: list[ComponentChain] = [
+        ComponentChain(desc="Example 10.2", components=components),
     ]
 
     # perform analysis with desired inputs
@@ -468,10 +484,5 @@ def example() -> None:
         Pin_dBm=-82.8,
         BW_MHz=10,
         Tin=150,
-        # SNR=70,
-        file="./sgc_example2.txt",
+        file="sgc_example.txt",
     )
-
-
-if __name__ == "__main__":
-    example()

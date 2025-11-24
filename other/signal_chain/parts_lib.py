@@ -1,5 +1,5 @@
 import json
-from signal_chain import Component, Amp, Loss, Mixer
+from signal_chain import RFComponent, Amp, Loss, Mixer
 from signal_chain import return_loss_to_VSWR
 
 
@@ -14,7 +14,7 @@ def get_VSWR_param(spec: dict[str, float]) -> float:
             return 1
 
 
-def parse_amp(name: str, spec: dict[str, float]) -> dict[str, Component]:
+def parse_amp(name: str, spec: dict[str, float]) -> dict[str, RFComponent]:
     """Take amplifier parameters from the catalog json and turn it into a Component object."""
     return {
         name: Amp(
@@ -27,7 +27,7 @@ def parse_amp(name: str, spec: dict[str, float]) -> dict[str, Component]:
     }
 
 
-def parse_mixer(name: str, spec: dict[str, float]) -> dict[str, Component]:
+def parse_mixer(name: str, spec: dict[str, float]) -> dict[str, RFComponent]:
     """Take mixer parameters from the catalog json and turn it into a Component object."""
     return {
         name: Mixer(
@@ -40,7 +40,7 @@ def parse_mixer(name: str, spec: dict[str, float]) -> dict[str, Component]:
     }
 
 
-def parse_lossy(name: str, spec: dict[str, float]) -> dict[str, Component]:
+def parse_lossy(name: str, spec: dict[str, float]) -> dict[str, RFComponent]:
     """Take parameters of lossy component from the catalog json and turn it into a Component object."""
     return {
         name: Loss(
@@ -52,11 +52,11 @@ def parse_lossy(name: str, spec: dict[str, float]) -> dict[str, Component]:
     }
 
 
-def read_catalog(filename: str) -> dict[str, Component]:
+def read_catalog(filename: str) -> dict[str, RFComponent]:
     with open(filename, "r") as f:
         catalog = json.load(f)
 
-    components: dict[str, Component] = {}
+    components: dict[str, RFComponent] = {}
     for category, parts_list in catalog.items():
         if category == "Amps":
             for name, spec in parts_list.items():
