@@ -17,7 +17,7 @@ def analyze_sections(
     By default the input noise is thermal (k*T0). Optionally, the input
     noise power density (NPSD) can be set in one of several ways.
     **kwargs:
-        Ni (float): set NPSD directly.
+        Ni (float): set NPSD directly, in dBm/Hz.
         Ni_dBm (float): Converts power to NPSD using the input bandwidth.
         Tin (float): set NPSD from noise temperature, k*Tin.
         SNR (float): Calculates the NPSD required to get SNR using input power and bandwidth.
@@ -47,7 +47,7 @@ def analyze_sections(
     # determine the input noise
     match kwargs:
         case {"Ni": _Ni}:
-            Ni = _Ni
+            Ni = undBm(_Ni)
         case {"Ni_dBm": Ni_dBm}:
             Ni = undBm(Ni_dBm) / BW
             if Ni < k * T0:
