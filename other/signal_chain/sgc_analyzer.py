@@ -1,11 +1,11 @@
+import os, sys
 from copy import deepcopy
-from os.path import abspath
-from sys import stdout
-from typing import Sequence, TextIO
+from io import TextIOBase
+from typing import Sequence
 
 from .noise_figure import cascade_G_F
 from .component_chain import ComponentChain
-from .util import *
+from .util import undBm, sdB, sdBm, k, T0
 
 
 def analyze_sections(
@@ -24,14 +24,14 @@ def analyze_sections(
 
         file (TextIO | str): Redirect script output to a file / filename.
     """
-    file: TextIO = stdout
+    file = sys.stdout
     if "file" in kwargs:
-        if isinstance(kwargs["file"], TextIO) and kwargs["file"] != stdout:
+        if isinstance(kwargs["file"], TextIOBase):
             file = kwargs["file"]
             if file.closed:
-                file = open(file.name, "w")
+                raise ValueError("Cannot output to closed file")
         elif isinstance(kwargs["file"], str):
-            output_file = abspath(kwargs["file"])
+            output_file = os.path.abspath(kwargs["file"])
             file = open(output_file, "w")
         else:
             raise TypeError("Ouput file invalid type")
@@ -101,7 +101,7 @@ def analyze_sections(
     fprint(f"  SNR_i = {sdB(start.Si/(start.Ni * BW))} dB ({BW_MHz} MHz)")
     fprint(f"  SNR_o = {sdB(end.So/(end.No * BW))} dB ({BW_MHz} MHz)")
 
-    if file != stdout:
+    if file != sys.stdout:
         file.close()
 
 

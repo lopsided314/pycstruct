@@ -57,6 +57,11 @@ def mismatch_loss_dB(VSWR: float) -> float:
     return dB(1 - refl_coeff**2)
 
 
+def return_loss_to_VSWR(return_loss_dB: float) -> float:
+    """Calculate VSWR from returnn loss."""
+    return 1 + 10 ** (-return_loss_dB / 20) / 1 - 10 ** (-return_loss_dB / 20)
+
+
 #
 # initialization values for dB units that don't
 # cause arithmetic errors when converting back
