@@ -3,19 +3,25 @@
 #include <unistd.h>
 
 int repeated_digits(long n) {
+    int match = 0;
     char str[100] = {0};
     char key[100] = {0};
 
     sprintf(str, "%ld", n);
-    printf("str = %s\n", str);
-    for (int i = 1; i < strlen(str)/2; i++) {
+    // printf("str = %s\n", str);
+    for (size_t i = 1; i < strlen(str); i++) {
         strncpy(key, str, i);
-        printf("key = %s\n", key);
-        for (int j = 0; j < strlen(str); j += i) {
-            printf("%s %i\n", str+j, j);
-            if (strncmp(str+j, key, i) != 0) {
-                continue;
+        match = 1;
+        for (size_t j = 0; j < strlen(str); j += i) {
+            // printf("%s %s %li\n", key, str+j, j);
+            if (strncmp(str + j, key, i) != 0) {
+                match = 0;
+                break;
             }
+        }
+        if (match) {
+            printf("Matched %ld\n", n);
+            return 1;
         }
     }
     return 0;
@@ -26,8 +32,8 @@ int main() {
     size_t len = 0;
     ssize_t read = 0;
 
-    FILE *fp = fopen("sample.txt", "r");
-    // FILE *fp = fopen("input.txt", "r");
+    // FILE *fp = fopen("sample.txt", "r");
+    FILE *fp = fopen("input.txt", "r");
     if (!fp) {
         perror("Fopen");
         return 1;
@@ -40,9 +46,10 @@ int main() {
         // printf("%ld %ld\n", start, stop);
         for (long i = start; i <= stop; i++) {
             if (repeated_digits(i)) {
-                printf("%ld\n",  i);
+                // printf("%ld\n",  i);
                 sum += i;
             }
+            // printf("\n");
         }
     }
     printf("sum = %ld\n", sum);
