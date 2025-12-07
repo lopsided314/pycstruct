@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,8 +14,8 @@ int main() {
     size_t len = 0;
     ssize_t read = 0;
 
-    FILE *fp = fopen("sample.txt", "r");
-    // FILE *fp = fopen("input.txt", "r");
+    // FILE *fp = fopen("sample.txt", "r");
+    FILE *fp = fopen("input.txt", "r");
     if (!fp) {
         perror("fopen");
         return 1;
@@ -36,33 +37,49 @@ int main() {
     fclose(fp);
 
     int n_col = strlen(input[n_lines - 1]);
+    printf("n col = %d\n", n_col);
     long total;
     long problem_total = 0;
     char problem_operand = 0;
-    for (int iCol = 0; iCol < n_col; iCol++) {
-        
+
+    char chars[MAX_LINES - 1] = {0};
+    int iChars = 0;
+    for (int iCol = 0; iCol < n_col+1; iCol++) {
+
         // start a new problem
-        if (input[n_lines-1][iCol] == '+' || input[n_lines-1][iCol] == '*') {
-            problem_operand = input[n_lines-1][iCol];
-            if (problem_total > 0) {
-                printf("%ld\n", problem_total);
-                total += problem_total;
+        if (input[n_lines - 1][iCol] == '+' || input[n_lines - 1][iCol] == '*') {
+            problem_operand = input[n_lines - 1][iCol];
+            printf("problem total = %ld\n", problem_total);
+            total += problem_total;
 
-                if (problem_operand == '*') {
-                    problem_total = 1;
-                } else {
-                    problem_total = 0;
-                }
+            if (problem_operand == '*') {
+                problem_total = 1;
+            } else {
+                problem_total = 0;
             }
-            continue;
         }
 
-        for (int iLine = n_lines - 2; iLine >= 0; iLine--) {
-            if (input[iLine][iCol] == ' ') 
+        iChars = 0;
+        memset(chars, 0, sizeof(chars));
+        for (int iLine = 0; iLine < n_lines - 1; iLine++) {
+            if (!isdigit(input[iLine][iCol]))
                 continue;
-            printf("%c\n", input[iLine][iCol]);
+            // printf("%c\n", input[iLine][iCol]);
+            chars[iChars++] = input[iLine][iCol];
         }
-        printf("\n");
+        if (strlen(chars) == 0)
+            continue;
+
+        if (problem_operand == '*') {
+            problem_total *= atol(chars);
+        } else {
+            problem_total += atol(chars);
+        }
+        printf("'%ld'\n", atol(chars));
     }
+
+    printf("problem total = %ld\n", problem_total);
+    total += problem_total;
+    printf("total = %ld", total);
     return 0;
 }
