@@ -3,13 +3,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#define MAX_LINES 5
 #define MAX_LINE 5000
 #define MAX_PROBLEMS 2000
-#define MAX_ARGS 5
-
-char operands[MAX_PROBLEMS] = {0};
-char problem_args[MAX_PROBLEMS][MAX_ARGS][6] = {0};
-int n_problems = 0;
 
 int main() {
     char delim = '\n';
@@ -17,15 +13,15 @@ int main() {
     size_t len = 0;
     ssize_t read = 0;
 
-    // FILE *fp = fopen("sample.txt", "r");
-    FILE *fp = fopen("input.txt", "r");
+    FILE *fp = fopen("sample.txt", "r");
+    // FILE *fp = fopen("input.txt", "r");
     if (!fp) {
-        perror("Fopen");
+        perror("fopen");
         return 1;
     }
 
     int n_lines = 0;
-    char input[MAX_ARGS][MAX_LINE] = {0};
+    char input[MAX_LINES][MAX_LINE] = {0};
     while ((read = getdelim(&line, &len, delim, fp)) != -1) {
         if (strlen(line) == 0) {
             continue;
@@ -39,23 +35,34 @@ int main() {
     }
     fclose(fp);
 
-    int problem_starts[MAX_PROBLEMS] = {0};
-    printf("%s\n", input[n_lines - 1]);
-    for (int i = MAX_LINE - 1; i >= 0; i--) {
-        if (input[n_lines - 1][i] == '+' || input[n_lines - 1][i] == '*') {
-            operands[n_problems] = input[n_lines - 1][i];
-            problem_starts[n_problems] = i;
-            n_problems++;
-            printf("%d\n", i);
+    int n_col = strlen(input[n_lines - 1]);
+    long total;
+    long problem_total = 0;
+    char problem_operand = 0;
+    for (int iCol = 0; iCol < n_col; iCol++) {
+        
+        // start a new problem
+        if (input[n_lines-1][iCol] == '+' || input[n_lines-1][iCol] == '*') {
+            problem_operand = input[n_lines-1][iCol];
+            if (problem_total > 0) {
+                printf("%ld\n", problem_total);
+                total += problem_total;
+
+                if (problem_operand == '*') {
+                    problem_total = 1;
+                } else {
+                    problem_total = 0;
+                }
+            }
+            continue;
         }
+
+        for (int iLine = n_lines - 2; iLine >= 0; iLine--) {
+            if (input[iLine][iCol] == ' ') 
+                continue;
+            printf("%c\n", input[iLine][iCol]);
+        }
+        printf("\n");
     }
-    printf("%d\n", n_problems);
-
-    // for (int i = 0; i < n_problems; i++) {
-    //     for (int j = 0; j < n_lines - 1; j++) {
-    //
-    //     }
-    // }
-
     return 0;
 }
