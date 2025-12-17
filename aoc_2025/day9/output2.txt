@@ -1,0 +1,8 @@
+Horizontal edge (1, 7) (1, 11) POS=0
+Vertical   edge (11, 1) (11, 7) POS=0
+Horizontal edge (7, 9) (7, 11) POS=0
+Vertical   edge (9, 5) (9, 7) POS=1
+Horizontal edge (5, 2) (5, 9) POS=0
+Vertical   edge (2, 3) (2, 5) POS=0
+Horizontal edge (3, 2) (3, 7) POS=1
+Vertical   edge (7, 1) (7, 3) POS=1

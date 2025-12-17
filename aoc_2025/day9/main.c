@@ -3,75 +3,101 @@
 #include <string.h>
 #include <unistd.h>
 
-typedef enum UDLR_t { Unset = 0, Up = 1, Down = 2, Left = 4, Right = 8 } UDLR;
+#define MAX_TILES 500
+#define ARRAY_MAX 100000
 
 typedef struct Corner_t {
-    int x, y;
-    UDLR open_directions;
+    int x0, y0;
+    int x1, y1;
+    enum Directions { Unset = 0, X_POS = 1, X_NEG = 2, Y_POS = 4, Y_NEG = 8 } dir;
 } Corner;
 
-typedef struct Edge_t {
-    Corner *t1, *t2;
-} Edge;
-
-// typedef struct Span_t {
-//     int start, stop;
-// } Span;
-
-long tile2_area(Corner *t1, Corner *t2) {
-    return (1 + labs(t1->x - t2->x)) * (1 + labs(t1->y - t2->y));
+int in_bounds(int val, int b1, int b2) {
+    return (b1 >= val && b2 <= val) || (b1 <= val && b2 >= val);
 }
 
-// int on_edge(int x, int y, const Edge *edge) {
-//     if (x == edge->t1->x && x == edge->t2->x) {
-//         if (edge->t1->y > edge->t2->y) {
-//             return (y <= edge->t1->y && y >= edge->t2->y);
-//         } else {
-//             return (y >= edge->t1->y && y <= edge->t2->y);
-//         }
-//     } else if (y == edge->t1->y && y == edge->t2->y) {
-//         if (edge->t1->x > edge->t2->x) {
-//             return (x <= edge->t1->x && x >= edge->t2->x);
-//         } else {
-//             return (x >= edge->t1->x && x <= edge->t2->x);
-//         }
-//     }
-//     return 0;
-// }
+long corner2_area(Corner *c1, Corner *c2) {
+    return (1 + labs(c1->x0 - c2->x0)) * (1 + labs(c1->y0 - c2->y0));
+}
 
-int edge_intersect(Edge *edge, Corner *c1, Corner *c2) {
-    // if the edge and intersect line are in the same
-    // direction, doesn't count as intersection...?
-    int edge_vert = (edge->t1->x == edge->t2->x);
-    int edge_horz = (edge->t1->y == edge->t2->y);
-    int intersect_vert = (c1->x == c2->x);
-    int intersect_horz = (c1->y == c2->y);
+int corner2_contains(Corner *c1, Corner *c2, Corner *t) {
+    // check if the test point is inside the rectangle
+    int inside_x = (c1->x0 > t->x0 && c2->x0 < t->x0) || (c1->x0 < t->x0 && c2->x0 > t->x0);
+    int inside_y = (c1->y0 > t->y0 && c2->y0 < t->y0) || (c1->y0 < t->y0 && c2->y0 > t->y0);
 
-    if ((edge_vert && intersect_vert) || (edge_horz && intersect_horz)) {
-        return 0;
+    if (inside_x && inside_y) {
+        return 1;
     }
 
-    if (edge_vert) {
-        int in_vert_span = (c1->y > edge->t1->y && c1->y < edge->t2->y) || (c1->y < edge->t1->y && c1->y > edge->t2->y);
-        if (!in_vert_span) {
-            return 0;
+    // check if the arms of the test point intersect
+    // with the rectangle
+    else if (inside_x) {
+        if (t->y0 > c1->y0 && t->y0 > c2->y0) {
+            if (t->y1 < c1->y0 || t->y1 < c2->y0) {
+                return 1;
+            }
+        } else {
+            if (t->y1 > c1->y0 || t->y1 > c2->y0) {
+                return 1;
+            }
         }
-        int intersect_start, intersect_stop;
-        if ((c2->x > edge->t1->x && c1->x < edge->t1->x) || (c1->x > edge->t1->x && c2->x < edge->t1->x)) {
-
+    } else if (inside_y) {
+        if (t->x0 > c1->x0 && t->x0 > c2->x0) {
+            if (t->x1 < c1->x0 || t->x1 < c2->x0) {
+                return 1;
+            }
+        } else {
+            if (t->x1 > c1->x0 || t->x1 > c2->x0) {
+                return 1;
+            }
         }
     }
-
     return 0;
 }
 
-#define MAX_TILES 500
 int n_tiles = 0;
+
 Corner corners[MAX_TILES] = {0};
-Edge edges[MAX_TILES] = {0};
-//
-#define ARRAY_SIZE 100000
-// // Span spans[ARRAY_SIZE] = {0};
+
+void make_edges() {
+    // connect all the corners with corners
+    for (int i = 0; i < n_tiles; i++) {
+        int i_next = (i == n_tiles - 1) ? 0 : i + 1;
+        int i_prev = (i == 0) ? n_tiles - 1 : i - 1;
+
+        if (corners[i].x0 == corners[i_next].x0) {
+            corners[i].y1 = corners[i_next].y0;
+            corners[i].x1 = corners[i_prev].x0;
+        } else {
+            corners[i].x1 = corners[i_next].x0;
+            corners[i].y1 = corners[i_prev].y0;
+        }
+    }
+
+    for (int i = 0; i < n_tiles; i++) {
+        int x0 = corners[i].x0;
+        int y0 = corners[i].y0;
+        for (int j = 0; j < n_tiles; j++) {
+            if (i == j)
+                continue;
+
+            if (in_bounds(x0, corners[j].x0, corners[j].x1)) {
+                if (y0 < corners[j].y0) {
+                    corners[i].dir |= Y_POS;
+                } else if (y0 > corners[j].y0) {
+                    corners[i].dir |= Y_NEG;
+                }
+            }
+            if (in_bounds(y0, corners[j].y0, corners[j].y1)) {
+                if (x0 < corners[j].x0) {
+                    corners[i].dir |= X_POS;
+                } else if (x0 > corners[j].x0) {
+                    corners[i].dir |= X_NEG;
+                }
+            }
+        }
+    }
+}
 
 int main() {
 
@@ -80,8 +106,8 @@ int main() {
     size_t len = 0;
     ssize_t read = 0;
 
-    FILE *fp = fopen("sample.txt", "r");
-    // FILE *fp = fopen("input.txt", "r");
+    // FILE *fp = fopen("sample.txt", "r");
+    FILE *fp = fopen("input.txt", "r");
     if (!fp) {
         perror("fopen");
         return 1;
@@ -96,50 +122,63 @@ int main() {
         }
         // printf("%s\n", line);
 
-        sscanf(line, "%d,%d", &corners[n_tiles].x, &corners[n_tiles].y);
+        sscanf(line, "%d,%d", &corners[n_tiles].x0, &corners[n_tiles].y0);
         n_tiles++;
     }
     fclose(fp);
 
-    for (int iCorner = 0; iCorner < n_tiles - 1; iCorner++) {
-        edges[iCorner].t1 = &corners[iCorner];
-        edges[iCorner].t2 = &corners[iCorner + 1];
-    }
-    edges[n_tiles - 1].t1 = &corners[n_tiles - 1];
-    edges[n_tiles - 1].t2 = &corners[0];
-
-    Corner *seed = NULL;
-    int iSeedCorner;
-    for (int y = 0; y < ARRAY_SIZE; y++) {
-        for (int x = 0; x < ARRAY_SIZE; x++) {
-            for (int iCorner = 0; iCorner < n_tiles; iCorner++) {
-                if (corners[iCorner].x == x && corners[iCorner].y == y) {
-                    seed = &corners[iCorner];
-                    seed->open_directions = Down | Right;
-                    iSeedCorner = iCorner;
-                    printf("Seed = (%d %d)\n", x, y);
-                }
-            }
-            if (seed) {
-                break;
-            }
-        }
-        if (seed) {
-            break;
-        }
-    }
+    make_edges();
 
     long area;
     long max_area = 0;
     for (int i = 0; i < n_tiles; i++) {
         for (int j = i + 1; j < n_tiles; j++) {
+            printf("\n");
+            printf("Checking (%d, %d) x (%d, %d):\n", corners[i].x0, corners[i].y0, corners[j].x0,
+                   corners[j].y0);
 
-            // make sure all the edges of the rectangle formed by
-            // the rectangle are
+            // check that the corners point at each other
+            int ok;
+            if (corners[i].x0 < corners[j].x0) {
+                ok = (corners[i].dir & X_POS) && (corners[j].dir & X_NEG);
+            } else {
+                ok = (corners[i].dir & X_NEG) && (corners[j].dir & X_POS);
+            }
+            if (!ok) {
+                printf("  skipping, x dir\n");
+                continue;
+            }
 
-            area = tile2_area(&corners[i], &corners[j]);
-            printf("(%d, %d) x (%d, %d) = %ld\n", corners[i].x, corners[i].y, corners[j].x,
-                   corners[j].y, area);
+            if (corners[i].y0 < corners[j].y0) {
+                ok = (corners[i].dir & Y_POS) && (corners[j].dir & Y_NEG);
+            } else {
+                ok = (corners[i].dir & Y_NEG) && (corners[j].dir & Y_POS);
+            }
+            if (!ok) {
+                printf("  skipping, y dir\n");
+                continue;
+            }
+
+            // check that the rectangle defined by the corners
+            // doesn't contain any other corners
+            int invalid = 0;
+            for (int n = 0; n < n_tiles; n++) {
+                if (n == i || n == j) {
+                    continue;
+                }
+                if (corner2_contains(&corners[i], &corners[j], &corners[n])) {
+                    printf("  skipping, contains (%d, %d)\n", corners[n].x0, corners[n].y0);
+                    invalid = 1;
+                    break;
+                }
+            }
+            if (invalid) {
+                continue;
+            }
+
+            area = corner2_area(&corners[i], &corners[j]);
+            printf("(%d, %d) x (%d, %d) = %ld\n", corners[i].x0, corners[i].y0, corners[j].x0,
+                   corners[j].y0, area);
             if (area > max_area)
                 max_area = area;
         }

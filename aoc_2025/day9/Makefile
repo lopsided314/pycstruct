@@ -1,3 +1,3 @@
 all:
 	gcc -ggdb -Wall -Wextra main.c -o test
-	./test
+	./test > output.txt
