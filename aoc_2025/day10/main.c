@@ -1,11 +1,54 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+#define MAX_CHOOSE 10
+static int combo_ints[MAX_CHOOSE] = {0};
+// return 1 if there are more combinations, 0 if all
+// have been generated
+int combo_generator(int N, int r) {
+    static int counters[MAX_CHOOSE] = {-1};
+    if (counters[0] == -1) {
+        for (int i = 0; i < r; i++) {
+            counters[i] = i;
+        }
+    }
+
+    if (counters[0] >= N) {
+        for (int i = 0; i < MAX_CHOOSE; i++) {
+            counters[i] = -1;
+            combo_ints[i] = -1;
+        }
+        return 0;
+    }
+
+    for (int i = 1; i < r - 1; i++) {
+        if (counters[i] >= N) {
+            counters[i - 1]++;
+            for (int j = i; j < r; j++) {
+                counters[j] = counters[j - 1] + 1;
+            }
+        }
+    }
+
+    if (counters[r - 1] >= N) {
+        counters[r - 2]++;
+        counters[r - 1] = counters[r - 2] + 1;
+        return combo_generator(N, r);
+    }
+    counters[r - 1]++;
+
+    for (int i = 0; i < MAX_CHOOSE; i++) {
+        combo_ints[i] = counters[i];
+    }
+    combo_ints[r - 1]--;
+
+    return 1;
+}
+
 //
 // Notes:
-//   the order of the button presses doesn't matter and can be
-//   simulated with XOR operations
 //
 //   the result of the button press sequence is just XOR of all
 //   the wiring diagrams for those buttons
@@ -17,101 +60,62 @@
 //   1 or 0 times, any more cancel each other out. This means
 //   the maximum sequence length is the number of buttons
 //
-//   possibilities for 1 button press:
-//     each button once - check the button wiring diagram bit pattern
-//     against the solution
-//   possibililties for 2 button presses:
-//     0^1, 0^2, ..., 0^N, 1^2, 1^3, ..., 1^N, ..., N-1^N (itertools.combinations(..., 2))
-//   possibililties for 3 button presses: itertools.combinations(..., 3)
-//   etc.
 //
+#define MAX_LIGHTS 10
+#define MAX_BUTTONS 15
 
-#define MAX_CHOOSE 10
+int run_machine(char *machine_def) {
+    printf("Machine = %s\n", machine_def);
 
-int combo_ints[MAX_CHOOSE] = {0};
-void init_combo_generator(int N, int r) {
-    (void)N;
-    for (int i = 0; i < r; i++) {
-        combo_ints[i] = i;
-    }
-}
-// return 1 if there are more combinations, 0 if all
-// have been generated
-int combo_generator(int N, int r) {
+    int lights = 0;
+    int buttons[MAX_BUTTONS] = {0};
+    // int joltages[MAX_LIGHTS] = {0};
+    int n_lights = 0, n_buttons = 0;
 
-    if (combo_ints[0] >= N) {
-        for (int i = 0; i < MAX_CHOOSE; i++) {
-            combo_ints[i] = -1;
+    char *word, *sword, *word_end, *sword_end;
+
+    word = strtok_r(machine_def, " ", &word_end);
+    for (size_t i = 1; i < strlen(word) - 1; i++) {
+        if (word[i] == '#') {
+            lights += (1 << (i - 1));
         }
-        return 0;
+        n_lights++;
     }
-
-    for (int i = 1; i < r - 1; i++) {
-        if (combo_ints[i] >= N) {
-            combo_ints[i - 1]++;
-            for (int j = i; j < r; j++) {
-                combo_ints[j] = combo_ints[j - 1] + 1;
-            }
-        }
-    }
-    if (combo_ints[r - 1] >= N) {
-        combo_ints[r - 2]++;
-        combo_ints[r - 1] = combo_ints[r - 2] + 1;
-        return combo_generator(N, r);
-    }
-    combo_ints[r - 1]++;
-    return 1;
-
-
+    // printf("lights = 0x%x\n", lights);
     while (1) {
-        if (combo_ints[0] >= N) {
-            printf("done\n");
-            return 0;
-        }
 
-        for (int i = 1; i < r - 1; i++) {
-            if (combo_ints[i] >= N) {
-                combo_ints[i - 1]++;
-                for (int j = i; j < r; j++) {
-                    combo_ints[j] = combo_ints[j - 1] + 1;
+        word = strtok_r(NULL, " ", &word_end);
+        if (word == NULL) {
+            break;
+        } else if (word[0] == '(') {
+            sword = strtok_r(word + 1, ",", &sword_end);
+            // printf("b = %d\n", atoi(sb));
+            buttons[n_buttons] += (1 << atoi(sword));
+            while (1) {
+                sword = strtok_r(NULL, ",", &sword_end);
+                if (sword == NULL) {
+                    break;
                 }
+                // printf("b = %d\n", atoi(sb));
+                buttons[n_buttons] += (1 << atoi(sword));
             }
-        }
-        if (combo_ints[r - 1] >= N) {
-            combo_ints[r - 2]++;
-            combo_ints[r - 1] = combo_ints[r - 2] + 1;
+            // printf("buton %d = 0x%x\n", n_buttons, buttons[n_buttons]);
+            n_buttons++;
+        } else if (word[0] == '{') {
+            // part 2...
             continue;
         }
-
-
-        printf("(");
-        for (int i = 0; i < r; i++) {
-            printf("%d ", combo_ints[i]);
-        }
-        printf(")\n");
-
-        combo_ints[r - 1]++;
     }
+
+    printf("%d lights\n", n_lights);
+    for (int i = 0; i < n_buttons; i++) {
+        printf("Button %d = 0x%x\n", i, buttons[i]);
+    }
+    printf("\n");
     return 0;
 }
 
-int run_machine(const char *machine_definitions) { return 0; }
-
 int main() {
-
-    int N = 5, r = 3;
-    init_combo_generator(N, r);
-    while (combo_generator(N, r)) {
-        printf("(");
-        for (int i = 0; i < r; i++) {
-            printf("%d ", combo_ints[i]);
-        }
-        printf(")\n");
-    }
-
-    printf("\n");
-    return 0;
-
     char delim = '\n';
     char *line = NULL;
     size_t len = 0;

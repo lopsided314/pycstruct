@@ -1,11 +1,24 @@
-(0 1 3 )
-(0 1 4 )
-(0 1 5 )
-(0 2 4 )
-(0 2 5 )
-(0 3 5 )
-(1 2 4 )
-(1 2 5 )
-(1 3 5 )
-(2 3 5 )
+Machine = [.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}
+4 lights
+Button 0 = 0x8
+Button 1 = 0xa
+Button 2 = 0x4
+Button 3 = 0xc
+Button 4 = 0x5
+Button 5 = 0x3
+
+Machine = [...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}
+5 lights
+Button 0 = 0x1d
+Button 1 = 0xc
+Button 2 = 0x11
+Button 3 = 0x7
+Button 4 = 0x1e
+
+Machine = [.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}
+6 lights
+Button 0 = 0x1f
+Button 1 = 0x19
+Button 2 = 0x37
+Button 3 = 0x6
 

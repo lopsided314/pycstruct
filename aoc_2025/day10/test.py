@@ -40,17 +40,18 @@ def loop(N, r):
             ijk[-2] += 1
             ijk[-1] = ijk[-2] + 1
             continue
-        print(f"{tuple(ijk)}")
         ijk[-1] += 1
+
+        ijk2 = ijk[:]
+        ijk2[-1] -= 1
+
+        print(f"{tuple(ijk2)}")
 
 
 if __name__ == "__main__":
     N = 5
-    r = 3
+    r = 4
 
     loop(N, r)
     print()
     stdlib_combinations(N, r)
-    exit()
-    print()
-    for_loops_4(4)
