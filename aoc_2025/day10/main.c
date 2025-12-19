@@ -81,7 +81,7 @@ int run_machine(char *machine_def) {
         }
         n_lights++;
     }
-    // printf("lights = 0x%x\n", lights);
+    printf("lights = 0x%x\n", lights);
     while (1) {
 
         word = strtok_r(NULL, " ", &word_end);
@@ -107,11 +107,22 @@ int run_machine(char *machine_def) {
         }
     }
 
-    printf("%d lights\n", n_lights);
-    for (int i = 0; i < n_buttons; i++) {
-        printf("Button %d = 0x%x\n", i, buttons[i]);
+    for (int r = 1; r < n_buttons; r++) {
+        while (combo_generator(n_buttons, r)) {
+
+            int light_sum = 0;
+            for (int i = 0; i < r; i++) {
+                light_sum ^= buttons[combo_ints[i]];
+                printf("%d-%x %x ", combo_ints[i], buttons[combo_ints[i]], light_sum);
+                if (light_sum == lights) {
+                    printf("Equal with %d\n", i+1);
+                    return i+1;
+                }
+            }
+            printf("\n");
+        }
     }
-    printf("\n");
+    printf("Failed to find sequence\n");
     return 0;
 }
 
@@ -121,13 +132,14 @@ int main() {
     size_t len = 0;
     ssize_t read = 0;
 
-    FILE *fp = fopen("sample.txt", "r");
-    // FILE *fp = fopen("input.txt", "r");
+    // FILE *fp = fopen("sample.txt", "r");
+    FILE *fp = fopen("input.txt", "r");
     if (!fp) {
         perror("Fopen");
         return 1;
     }
 
+    long total = 0;
     while ((read = getdelim(&line, &len, delim, fp)) != -1) {
         if (line[strlen(line) - 1] == delim)
             line[strlen(line) - 1] = '\0';
@@ -136,9 +148,10 @@ int main() {
             continue;
         }
 
-        run_machine(line);
+        total += run_machine(line);
     }
 
+    printf("Total = %ld\n", total);
     fclose(fp);
     return 0;
 }
