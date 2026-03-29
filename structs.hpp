@@ -1,12 +1,14 @@
 #pragma once
 
 #include "utils/jstrings/jstrings.hpp"
-#include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
-#define REGISTER_STRUCT(a, b)
-#define REGISTER_STRUCT_PACK(a, b, pragma_pack)
+#define REGISTER_STRUCT(typename, instance_name)
+#define REGISTER_STRUCT_PACK(typename, instance_name, pragma_pack)
+
+namespace Structs {
 
 void init_structs();
 
@@ -18,8 +20,8 @@ struct Var {
     size_t sizeof_ctype;
     size_t offset;
     std::string name;
-    std::function<void(const JStringList &)> set;
-    std::function<void(const JStringList &)> print;
+    void (*set)(const JStringList &);
+    void (*print)(const JStringList &);
 };
 
 struct Struct {
@@ -27,8 +29,10 @@ struct Struct {
     size_t size = 0;
     std::string name;
     std::string type;
-    std::function<void(const JStringList &)> print;
-    std::map<std::string, Var> vars;
+    std::string src_filepath;
+    std::string src_definition;
+    void (*print)(const JStringList &);
+    std::map<std::string, std::unique_ptr<Var>> vars;
     size_t working_addr = 0;
 };
 
@@ -50,3 +54,4 @@ struct StructParseOutput {
 };
 
 StructParseOutput parse_struct_input(const JStringList &args);
+} // namespace Structs

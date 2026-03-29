@@ -39,7 +39,7 @@ inline bool contains(const JStringList &strs, std::string key) {
 
 /*===========================================================================*/
 
-inline bool contains_any(const std::string &str, std::string chars) {
+inline bool contains_any(const std::string &str, const std::string& chars) {
     for (char c : chars) {
         if (str.find(c) != std::string::npos)
             return true;
@@ -57,7 +57,7 @@ inline bool contains_any(const JStringList &strs, const JStringList &keys) {
 
 /*===========================================================================*/
 
-inline bool contains_all(const std::string &str, std::string chars) {
+inline bool contains_all(const std::string &str, const std::string& chars) {
     for (char c : chars) {
         if (str.find(c) == std::string::npos)
             return false;
@@ -75,7 +75,7 @@ inline bool contains_all(const JStringList &strs, const JStringList &keys) {
 
 /*===========================================================================*/
 
-inline bool contains_only(const std::string &str, std::string chars) {
+inline bool contains_only(const std::string &str, const std::string& chars) {
     for (char c : str) {
         if (chars.find(c) == std::string::npos)
             return false;

@@ -1,8 +1,6 @@
 #include "structs.hpp"
 
-#include <iostream>
-#include <stdio.h>
-
+#include <fmt/core.h>
 #include <vector>
 
 struct Test {
@@ -29,7 +27,7 @@ volatile uint8_t g_data[1024];
 
 void print_buf() {
     for (size_t i = 0; i < 20; i++) {
-        printf("%2lu, %8X\n", i*4, *(uint32_t*)&g_data[4*i]);
+        fmt::print("%{}, {:8X}", i*4, *(uint32_t*)&g_data[4*i]);
     }
 }
 
@@ -93,17 +91,17 @@ int main() {
             break;
 
         case ERROR:
-            std::cout << "error\n";
+            fmt::print("error");
             return 0;
 
         case PASS:
-            std::cout << "pass: " << js::join(args, " ") << "\n";
+            fmt::print("pass: {}", js::join(args, " "));
             break;
 
         default:
-            std::cout << "default???\n";
+            fmt::print("default???");
             break;
         }
-        std::cout << "\n";
+        fmt::print("");
     }
 }

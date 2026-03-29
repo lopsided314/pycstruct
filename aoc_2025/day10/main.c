@@ -7,7 +7,7 @@
 static int combo_ints[MAX_CHOOSE] = {0};
 // return 1 if there are more combinations, 0 if all
 // have been generated
-int combo_generator(int N, int r) {
+static int combo_generator(int N, int r) {
     static int counters[MAX_CHOOSE] = {-1};
     if (counters[0] == -1) {
         for (int i = 0; i < r; i++) {
@@ -15,7 +15,7 @@ int combo_generator(int N, int r) {
         }
     }
 
-    if (counters[0] >= N) {
+    if (counters[0] >= N || N <= 0 || r <= 0) {
         for (int i = 0; i < MAX_CHOOSE; i++) {
             counters[i] = -1;
             combo_ints[i] = -1;
@@ -99,7 +99,7 @@ int run_machine(char *machine_def) {
                 // printf("b = %d\n", atoi(sb));
                 buttons[n_buttons] += (1 << atoi(sword));
             }
-            // printf("buton %d = 0x%x\n", n_buttons, buttons[n_buttons]);
+            printf("button %d = 0x%x\n", n_buttons, buttons[n_buttons]);
             n_buttons++;
         } else if (word[0] == '{') {
             // part 2...
@@ -108,6 +108,8 @@ int run_machine(char *machine_def) {
     }
 
     for (int r = 1; r < n_buttons; r++) {
+        printf("r = %d\n", r);
+        printf("%d %d\n", combo_ints[0], combo_ints[1]);
         while (combo_generator(n_buttons, r)) {
 
             int light_sum = 0;
@@ -115,18 +117,21 @@ int run_machine(char *machine_def) {
                 light_sum ^= buttons[combo_ints[i]];
                 printf("%d-%x %x ", combo_ints[i], buttons[combo_ints[i]], light_sum);
                 if (light_sum == lights) {
-                    printf("Equal with %d\n", i+1);
-                    return i+1;
+                    printf("Equal with %d\n", i + 1);
+                    combo_generator(-1, -1);
+                    return i + 1;
                 }
             }
             printf("\n");
         }
     }
     printf("Failed to find sequence\n");
+    combo_generator(-1, -1);
     return 0;
 }
 
 int main() {
+
     char delim = '\n';
     char *line = NULL;
     size_t len = 0;
@@ -134,6 +139,7 @@ int main() {
 
     // FILE *fp = fopen("sample.txt", "r");
     FILE *fp = fopen("input.txt", "r");
+    // FILE *fp = fopen("sample2.txt", "r");
     if (!fp) {
         perror("Fopen");
         return 1;
