@@ -20,7 +20,7 @@ OVERWRITE_WARNING = """
 \n\n
 """
 
-DEBUG_PRINT = True
+DEBUG_PRINT = False
 
 
 def deformat_source(src_text: str) -> str:
@@ -77,7 +77,7 @@ def reformat_struct(struct_def: str) -> str:
     struct_def = re.sub(r"\s*struct\s*", "struct ", struct_def, flags=re.DOTALL)
     struct_def = re.sub(r"\s*union\s*", "union ", struct_def, flags=re.DOTALL)
     struct_def = re.sub(r"\s*{\s*", "\n{\n", struct_def, flags=re.DOTALL)
-    struct_def = re.sub(r"\s*}\s*", "\n}", struct_def, flags=re.DOTALL)
+    struct_def = re.sub(r"\s*}\s*", "\n} ", struct_def, flags=re.DOTALL)
     struct_def = re.sub(r"\s*;\s*", ";\n", struct_def, flags=re.DOTALL)
     struct_def = re.sub(r"\s*,\s*", ", ", struct_def, flags=re.DOTALL)
     struct_def = re.sub(r"\s*\*\s*", " *", struct_def, flags=re.DOTALL)
@@ -494,7 +494,7 @@ def find_top_struct_defs(text: str, filename: str) -> dict[str, ObjectFrame]:
 def get_filename_list(includes: list[str]) -> set[str]:
     """
     Based on the include paths generate a list of filenames to check for
-    struct definitions and register requests. 
+    struct definitions and register requests.
 
     Apply some filtering of the name list based on extesion and manual
     limiters. Resolve all symbolic links and normalize path formatting.
@@ -513,7 +513,7 @@ def get_filename_list(includes: list[str]) -> set[str]:
         if any(skip in filename for skip in patterns_to_skip):
             return False
 
-        files_to_skip: tuple[str, ...] = ()
+        files_to_skip: tuple[str, ...] = ("json.hpp",)
         if any(os.path.basename(filename) == skip for skip in files_to_skip):
             return False
 
@@ -580,7 +580,7 @@ def main(make_includes: list[str]) -> None:
             instances.append(f"#pragma pack(pop)")
 
         macros.append(
-            f'REGISTER_INTERNAL_STRUCT(_{request.typename}, {request.instance_name}, "{requested_struct.src_file}", "{reformat_struct(requested_struct.raw_full)}");'
+            f'REGISTER_INTERNAL_STRUCT({request.typename}, {request.instance_name}, "{requested_struct.src_file}", "{reformat_struct(requested_struct.raw_full)}");'
         )
         macros += defined_structs[request.typename].reg_macros(request.instance_name)
         macros.append("")

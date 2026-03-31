@@ -43,6 +43,7 @@ void read(uint8_t *data, size_t size, size_t offset) {
 namespace js = JStrings;
 
 int main() {
+    using namespace Structs;
 
     init_structs();
 
@@ -57,6 +58,7 @@ int main() {
         // {"co", "name->val", "0x111111"},
         // {"co", "name->b", "123445678"},
         // {"co", "name->c", "deadbeef"},
+        {"co", "name->u1.f", "-3.1415"},
         {"ci", "name->"},
         {"ci", "name->plpl*"},
         // {"mv", "name->", "100"},
@@ -65,43 +67,39 @@ int main() {
         // {"co", "name->d[1]", "-3.1415"},
         // {"co", "name->str", "some",  "text"},
         // {"ci", "name->"},
+        {"struct_src", "name->"},
     };
 
     for (const JStringList &args : arg_sets) {
 
-        StructParseOutput cmd = parse_struct_input(args);
+        StructCmdFeedback cmd = parse_struct_cmd(args);
 
         switch (cmd.op) {
-        case READ_VAR:
+        case PRINT:
             read(cmd.data, cmd.size, cmd.offset);
-            cmd.v->print(args);
-            break;
-
-        case READ_STRUCT:
-            read(cmd.data, cmd.size, cmd.offset);
-            cmd.s->print(args);
+            cmd.print(args);
             break;
 
         case READ_WRITE:
             read(cmd.data, cmd.size, cmd.offset);
-            cmd.v->set(args);
             // fall through
         case WRITE:
+            cmd.set_val(args);
             write(cmd.data, cmd.size, cmd.offset);
             break;
 
         case ERROR:
-            fmt::print("error");
+            fmt::println("error");
             return 0;
 
         case PASS:
-            fmt::print("pass: {}", js::join(args, " "));
+            fmt::println("pass: {}", js::join(args, " "));
             break;
 
         default:
-            fmt::print("default???");
+            fmt::println("default???");
             break;
         }
-        fmt::print("");
+        fmt::println("");
     }
 }
