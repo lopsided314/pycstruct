@@ -92,20 +92,22 @@ def reformat_struct(struct_def: str) -> str:
     return "\\n".join(lines)
 
 
-cli_types: dict[str, tuple[str, str, str]] = {
-    "i8": ("i8", "4", "stol"),
-    "u8": ("u8", "02X", "stoul_0x"),
-    "i16": ("i16", "6", "stol"),
-    "u16": ("u16", "04X", "stoul_0x"),
-    "i32": ("i32", "11", "stol"),
-    "u32": ("u32", "08X", "stoul_0x"),
-    "i64": ("i64", "20", "stol"),
-    "u64": ("u64", "016X", "stoul_0x"),
-    "f32": ("f32", "11.4e", "stod"),
-    "f64": ("f64", "11.4e", "stod"),
+cli_types: dict[str, tuple[str, str]] = {
+    "i8": ("4d", "stol"),
+    "u8": ("02X", "stoul_0x"),
+    "i16": ("6d", "stol"),
+    "u16": ("04X", "stoul_0x"),
+    "i32": ("11d", "stol"),
+    "u32": ("08X", "stoul_0x"),
+    "i64": ("20ld", "stol"),
+    "li64": ("20lld", "stol"),
+    "u64": ("016lX", "stoul_0x"),
+    "lu64": ("016llX", "stoul_0x"),
+    "f32": ("11.4e", "stod"),
+    "f64": ("11.4e", "stod"),
 }
-ctype_fmts: dict[str, tuple[str, str, str]] = {
-    "bool": ("u8", "%1X", "stoul_0x"),
+ctype_fmts: dict[str, tuple[str, str]] = {
+    "bool": ("%1X", "stoul_0x"),
     "int8_t": cli_types["i8"],
     "char": cli_types["i8"],
     "signed char": cli_types["i8"],
@@ -130,16 +132,16 @@ ctype_fmts: dict[str, tuple[str, str, str]] = {
     "long int": cli_types["i64"],
     "signed long": cli_types["i64"],
     "signed long int": cli_types["i64"],
-    "long long": cli_types["i64"],
-    "long long int": cli_types["i64"],
-    "signed long long": cli_types["i64"],
-    "signed long long int": cli_types["i64"],
     "ssize_t": cli_types["i64"],
+    "long long": cli_types["li64"],
+    "long long int": cli_types["li64"],
+    "signed long long": cli_types["li64"],
+    "signed long long int": cli_types["li64"],
     "uint64_t": cli_types["u64"],
     "unsigned long": cli_types["u64"],
     "unsigned long int": cli_types["u64"],
-    "unsigned long long": cli_types["u64"],
-    "unsigned long long int": cli_types["u64"],
+    "unsigned long long": cli_types["lu64"],
+    "unsigned long long int": cli_types["lu64"],
     "size_t": cli_types["u64"],
     "float": cli_types["f32"],
     "double": cli_types["f64"],
@@ -189,7 +191,7 @@ class CStdVar:
         if self.ctype not in ctype_fmts:
             return ""
 
-        _, printf, stonum = ctype_fmts[self.ctype]
+        printf, stonum = ctype_fmts[self.ctype]
         if self.size == 0:
             return f'REGISTER_VAR({parent}, {name_base}{self.name}, {self.ctype}, "{printf}", {stonum});'
 
@@ -234,7 +236,7 @@ class CBitfield:
             return []
 
         macros: list[str] = []
-        _, printf, stonum = ctype_fmts[self.ctype]
+        printf, stonum = ctype_fmts[self.ctype]
 
         # The unsigned prints have leading zeros that don't accurately
         # represent a bitfield size, e.g.
@@ -261,7 +263,7 @@ class ObjectFrame:
     of that.
     """
 
-    def __init__(self, body_def: str, parents: list, src_file: str) -> None:
+    def __init__(self, body_def: str, parents: list) -> None:
         """Parse the definition of an 'Object Frame'.
 
         Get the names and types of all members of the object. This call is
@@ -271,7 +273,8 @@ class ObjectFrame:
 
         self.raw_full: str = body_def.strip()
         self.parents: list[ObjectFrame] = parents
-        self.src_file: str = src_file
+        self.src_file: str = ""
+        self.src_file_mtime: int = 0
 
         self.instance_name: str = self.raw_full[
             self.raw_full.rfind("}") + 1 : self.raw_full.rfind(";")
@@ -340,7 +343,7 @@ class ObjectFrame:
             if not frame:
                 continue
 
-            self.frames.append(ObjectFrame(frame, self.parents + [self], self.src_file))
+            self.frames.append(ObjectFrame(frame, self.parents + [self]))
             only_members = only_members.replace(frame, "")
 
         for member in only_members.split(";"):
@@ -486,7 +489,11 @@ def find_top_struct_defs(text: str, filename: str) -> dict[str, ObjectFrame]:
         frame, remainder = pop_object_frame(remainder)
         if not frame:
             continue
-        frames.append(ObjectFrame(frame, [], filename))
+
+        obj = ObjectFrame(frame, [])
+        obj.src_file = filename
+        obj.src_file_mtime = int(os.path.getmtime(filename))
+        frames.append(obj)
 
     return {s.typename: s for s in frames if s.frame_type == "struct"}
 
@@ -509,7 +516,7 @@ def get_filename_list(includes: list[str]) -> set[str]:
         if not any(filename[-len(ext) :] == ext for ext in valid_exts):
             return False
 
-        patterns_to_skip: tuple[str, ...] = ("/fmt/",)
+        patterns_to_skip: tuple[str, ...] = ()
         if any(skip in filename for skip in patterns_to_skip):
             return False
 
@@ -580,7 +587,7 @@ def main(make_includes: list[str]) -> None:
             instances.append(f"#pragma pack(pop)")
 
         macros.append(
-            f'REGISTER_INTERNAL_STRUCT({request.typename}, {request.instance_name}, "{requested_struct.src_file}", "{reformat_struct(requested_struct.raw_full)}");'
+            f'REGISTER_INTERNAL_STRUCT({request.typename}, {request.instance_name}, "{requested_struct.src_file}", "{reformat_struct(requested_struct.raw_full)}", {requested_struct.src_file_mtime});'
         )
         macros += defined_structs[request.typename].reg_macros(request.instance_name)
         macros.append("")

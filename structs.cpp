@@ -50,11 +50,12 @@
 #include "structs.hpp"
 
 #include <cassert>
+#include <iostream>
 #include <map>
+#include <sys/stat.h>
 #include <vector>
 
-#include <fmt/core.h>
-
+#include "utils/datetime/datetime.hpp"
 #include "utils/jstrings/jstrings.hpp"
 
 static std::string g_err;
@@ -63,7 +64,7 @@ namespace js = JStrings;
 
 // The print here allows for printing all partial variable name matches. Makes things
 // like name->plpl* possible.
-#define REGISTER_INTERNAL_STRUCT(structtype, sname, src_path, raw_src)                             \
+#define REGISTER_INTERNAL_STRUCT(structtype, sname, src_path, raw_src, src_mtime)                  \
     g_structs[#sname] = Struct{};                                                                  \
     g_structs[#sname].data = (uint8_t *)&sname;                                                    \
     g_structs[#sname].size = sizeof(sname);                                                        \
@@ -71,6 +72,7 @@ namespace js = JStrings;
     g_structs[#sname].type = #structtype;                                                          \
     g_structs[#sname].src_filepath = src_path;                                                     \
     g_structs[#sname].src_definition = raw_src;                                                    \
+    g_structs[#sname].src_file_mtime = src_mtime;                                                  \
     g_structs[#sname].print = [](const JStringList &args) {                                        \
         std::string partial_name = js::strip(args[1], "*");                                        \
         for (const auto &var : g_structs[#sname].vars) {                                           \
@@ -78,7 +80,7 @@ namespace js = JStrings;
                 var.second.print(args);                                                            \
             }                                                                                      \
         }                                                                                          \
-        fmt::println("");                                                                          \
+        std::cout << "\n";                                                                         \
     };
 
 #define REGISTER_VAR(sname, vname, ctype, printf_fmt, stonum)                                      \
@@ -98,7 +100,7 @@ namespace js = JStrings;
     };                                                                                             \
     g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
         (void)args;                                                                                \
-        fmt::println(#sname "->" #vname " = {:" printf_fmt "}", sname.vname);                      \
+        std::cout << js::fmt(#sname "->" #vname " = " printf_fmt "\n", sname.vname);               \
     };
 
 #define REGISTER_CHAR_ARR(sname, vname)                                                            \
@@ -121,7 +123,7 @@ namespace js = JStrings;
     g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
         (void)args;                                                                                \
         sname.vname[sizeof(sname.vname) - 1] = '\0';                                               \
-        fmt::println(#sname "->" #vname " = \"{}\"", sname.vname);                                 \
+        std::cout << js::fmt(#sname "->" #vname " = \"%s\"", sname.vname);                         \
     };
 
 #define REGISTER_BITFIELD(sname, vname, ctype, printf_fmt, stonum)                                 \
@@ -141,7 +143,7 @@ namespace js = JStrings;
     };                                                                                             \
     g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
         (void)args;                                                                                \
-        fmt::println(#sname "->" #vname " = {:" printf_fmt "}", +sname.vname);                     \
+        std::cout << js::fmt(#sname "->" #vname " = " printf_fmt "\n", sname.vname);               \
     };
 
 #define REGISTER_ARR(sname, vname, length, ctype, printf_fmt, stonum)                              \
@@ -167,7 +169,8 @@ namespace js = JStrings;
     g_structs[#sname].vars[#vname].print = [](const JStringList &args) {                           \
         auto indices = get_array_slice_indices(args[1], length);                                   \
         for (int i : indices) {                                                                    \
-            fmt::println(#sname "->" #vname "[{:3}] = {:" printf_fmt "}", i, sname.vname[i]);      \
+            std::cout << js::fmt(#sname "->" #vname "[%3d] = " printf_fmt "\n", i,                 \
+                                 sname.vname[i]);                                                  \
         }                                                                                          \
     };
 
@@ -178,21 +181,21 @@ namespace js = JStrings;
 static unsigned long cout_stoul_0x(const std::string &str) {
     unsigned long val = js::stoul_0x(str, &g_err);
     if (g_err.length() > 0) {
-        fmt::println("Failed {}", g_err);
+        std::cout << "Failed " << g_err << "\n";
     }
     return val;
 }
 static long cout_stol(const std::string &str) {
     long val = js::stol(str, &g_err);
     if (g_err.length() > 0) {
-        fmt::println("Failed {}", g_err);
+        std::cout << "Failed " << g_err << "\n";
     }
     return val;
 }
 static double cout_stod(const std::string &str) {
     double val = js::stod(str, &g_err);
     if (g_err.length() > 0) {
-        fmt::println("Failed {}", g_err);
+        std::cout << "Failed " << g_err << "\n";
     }
     return val;
 }
@@ -236,7 +239,7 @@ static std::vector<int> get_array_slice_indices(std::string vname, int index_lim
         }
 
         if (g_err.length() > 0 || i < 0 || i > index_limit) {
-            fmt::println("Invalid array index: {}", s);
+            std::cout << "Invalid array index: " << s << "\n";
             return INDEX_ERR;
         }
 
@@ -248,7 +251,7 @@ static std::vector<int> get_array_slice_indices(std::string vname, int index_lim
 
         auto brace_split = js::split(brace_contents, ":", js::TrimAll);
         if (brace_split.size() != 2) {
-            fmt::println("Invalid array slice");
+            std::cout << "Invalid array slice\n";
             return {};
         }
 
@@ -273,7 +276,7 @@ static std::vector<int> get_array_slice_indices(std::string vname, int index_lim
 
             int i = index_stol(s);
             if (i == index_limit) {
-                fmt::println("Invalid array slice");
+                std::cout << "Invalid array slice\n";
                 return {};
             } else if (i == INDEX_ERR) {
                 return {};
@@ -308,6 +311,7 @@ struct Struct {
     std::string type;
     std::string src_filepath;
     std::string src_definition;
+    time_t src_file_mtime = 0;
     void (*print)(const JStringList &);
     std::map<std::string, Var> vars;
     size_t working_addr = 0;
@@ -329,25 +333,25 @@ struct StructFind {
 //
 StructFind get_struct(const std::string &svname) {
 
-    StructFind ret{};
     auto strs = js::split(svname, "->", js::TrimAll);
 
     if (strs.size() != 2) {
-        fmt::println("Invalid struct name");
-        return ret;
+        std::cout << "Invalid struct name\n";
+        return {};
     }
 
     std::string sname = strs[0];
     std::string vname = strs[1];
 
     if (!g_structs.count(sname)) {
-        return ret;
+        return {};
     }
 
     if (js::contains_all(vname, "[]")) {
         js::slice(&vname, 0, vname.find('['));
     }
 
+    StructFind ret{};
     ret.s = &g_structs[sname];
 
     if (vname.length() > 0) {
@@ -377,14 +381,14 @@ StructCmdFeedback parse_struct_cmd(const JStringList &args) {
     StructCmdFeedback ret{};
 
     if (args.size() < 2) {
-        fmt::println("Invalid args for struct operation");
+        std::cout << "Invalid args for struct operation\n";
         return ret;
     }
 
     const auto sv = get_struct(args[1]);
 
     if (!sv.s) {
-        fmt::println("Couldn't find struct \"{}\"", args[1]);
+        std::cout << "Coulnd't find struct \"" << args[1] << "\"\n";
         return ret;
     }
 
@@ -396,7 +400,7 @@ StructCmdFeedback parse_struct_cmd(const JStringList &args) {
     if (addr_cmd && !sv.v && args.size() == 3) {
         size_t new_addr = js::stoul_0x(args[2], &g_err);
         if (g_err.length() > 0) {
-            fmt::println("set struct addr: {}", g_err);
+            std::cout << "set struct addr: " << g_err << "\n";
         } else {
             sv.s->working_addr = new_addr;
             ret.op = PASS;
@@ -437,13 +441,17 @@ StructCmdFeedback parse_struct_cmd(const JStringList &args) {
     }
 
     if (src_def_cmd) {
-        fmt::println(" -> struct {} \"{}\" definition from {}:\n\n{}\n\n", sv.s->type, sv.s->name,
-                     sv.s->src_filepath, sv.s->src_definition);
+        std::cout << " -> struct " << sv.s->type << " \"" << sv.s->name << "\" definition from "
+                  << sv.s->src_filepath << " [last modified "
+                  << DateTime::time_str(sv.s->src_file_mtime) << " "
+                  << DateTime::date_str(sv.s->src_file_mtime) << "]:\n\n"
+                  << sv.s->src_definition << "\n\n";
+
         ret.op = PASS;
     }
 
     if (ret.op == ERROR) {
-        fmt::println("Invalid args for struct operation");
+        std::cout << "Invalid args for struct operation\n";
     }
 
     return ret;
@@ -455,6 +463,20 @@ StructCmdFeedback parse_struct_cmd(const JStringList &args) {
 
 void init_structs() {
 #include "pycstruct_macros.txt"
+
+    struct stat struct_stat;
+    for (const auto &_s : g_structs) {
+        const Struct &s = _s.second;
+        if (stat(s.src_filepath.c_str(), &struct_stat) < 0) {
+            std::cout << "Cannot stat " << s.type << " " << s.name << " (" << s.src_filepath
+                      << "): " << strerror(errno) << "\n";
+            continue;
+        }
+
+        if (struct_stat.st_mtim.tv_sec > s.src_file_mtime) {
+            std::cout << "struct " << s.type << " source file has modification time";
+        }
+    }
 }
 
 } // namespace Structs

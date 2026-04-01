@@ -1,6 +1,6 @@
 #include "structs.hpp"
 
-#include <fmt/core.h>
+#include <iostream>
 #include <vector>
 
 struct Test {
@@ -22,15 +22,15 @@ REGISTER_STRUCT(Test, test);
 REGISTER_STRUCT(Test2, test2);
 REGISTER_STRUCT_PACK(Name2, name, 4);
 
+namespace js = JStrings;
 
 volatile uint8_t g_data[1024];
 
 void print_buf() {
     for (size_t i = 0; i < 20; i++) {
-        fmt::print("%{}, {:8X}", i*4, *(uint32_t*)&g_data[4*i]);
+        std::cout << js::fmt("%d, %8X\n", i * 4, *(uint32_t *)&g_data[4 * i]);
     }
 }
-
 
 void write(uint8_t *data, size_t size, size_t offset) {
     // printf("  write: %p %lu\n", data, size);
@@ -40,7 +40,6 @@ void read(uint8_t *data, size_t size, size_t offset) {
     // printf("  read : %p %lu\n", data, size);
     memcpy(data, (void *)(g_data + offset), size);
 }
-namespace js = JStrings;
 
 int main() {
     using namespace Structs;
@@ -89,17 +88,17 @@ int main() {
             break;
 
         case ERROR:
-            fmt::println("error");
+            std::cout << "error\n";
             return 0;
 
         case PASS:
-            fmt::println("pass: {}", js::join(args, " "));
+            std::cout << "pass: " << js::join(args, " ") << "\n";
             break;
 
         default:
-            fmt::println("default???");
+            std::cout << "default???\n";
             break;
         }
-        fmt::println("");
+        std::cout << "\n";
     }
 }
