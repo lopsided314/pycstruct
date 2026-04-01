@@ -50,6 +50,8 @@
 #include "structs.hpp"
 
 #include <cassert>
+#include <climits>
+#include <ctime>
 #include <iostream>
 #include <map>
 #include <sys/stat.h>
@@ -64,7 +66,7 @@ namespace js = JStrings;
 
 // The print here allows for printing all partial variable name matches. Makes things
 // like name->plpl* possible.
-#define REGISTER_INTERNAL_STRUCT(structtype, sname, src_path, raw_src, src_mtime)                  \
+#define REGISTER_INTERNAL_STRUCT(structtype, sname, src_path, raw_src)                             \
     g_structs[#sname] = Struct{};                                                                  \
     g_structs[#sname].data = (uint8_t *)&sname;                                                    \
     g_structs[#sname].size = sizeof(sname);                                                        \
@@ -72,7 +74,6 @@ namespace js = JStrings;
     g_structs[#sname].type = #structtype;                                                          \
     g_structs[#sname].src_filepath = src_path;                                                     \
     g_structs[#sname].src_definition = raw_src;                                                    \
-    g_structs[#sname].src_file_mtime = src_mtime;                                                  \
     g_structs[#sname].print = [](const JStringList &args) {                                        \
         std::string partial_name = js::strip(args[1], "*");                                        \
         for (const auto &var : g_structs[#sname].vars) {                                           \
@@ -311,7 +312,6 @@ struct Struct {
     std::string type;
     std::string src_filepath;
     std::string src_definition;
-    time_t src_file_mtime = 0;
     void (*print)(const JStringList &);
     std::map<std::string, Var> vars;
     size_t working_addr = 0;
@@ -442,9 +442,7 @@ StructCmdFeedback parse_struct_cmd(const JStringList &args) {
 
     if (src_def_cmd) {
         std::cout << " -> struct " << sv.s->type << " \"" << sv.s->name << "\" definition from "
-                  << sv.s->src_filepath << " [last modified "
-                  << DateTime::time_str(sv.s->src_file_mtime) << " "
-                  << DateTime::date_str(sv.s->src_file_mtime) << "]:\n\n"
+                  << sv.s->src_filepath << ":\n\n"
                   << sv.s->src_definition << "\n\n";
 
         ret.op = PASS;
@@ -459,23 +457,44 @@ StructCmdFeedback parse_struct_cmd(const JStringList &args) {
 
 /*================================================================================*/
 
+#ifndef COMPILE_EPOCH
+#define COMPILE_EPOCH SSIZE_MAX
+#endif
+
 #include "pycstruct_instances.txt"
 
 void init_structs() {
+
 #include "pycstruct_macros.txt"
 
+    JStringList mod_time_warnings;
     struct stat struct_stat;
+
+    // Go through all the structs that have been registered and see if any of
+    // their source files have modification times after the struct macros were
+    // generated and compiled.
     for (const auto &_s : g_structs) {
         const Struct &s = _s.second;
+
         if (stat(s.src_filepath.c_str(), &struct_stat) < 0) {
-            std::cout << "Cannot stat " << s.type << " " << s.name << " (" << s.src_filepath
-                      << "): " << strerror(errno) << "\n";
+            std::cout << "Cannot stat source for " << s.type << " \"" << s.name << "\" ("
+                      << s.src_filepath << "): " << strerror(errno) << "\n";
             continue;
         }
 
-        if (struct_stat.st_mtim.tv_sec > s.src_file_mtime) {
-            std::cout << "struct " << s.type << " source file has modification time";
+        if (struct_stat.st_mtim.tv_sec > COMPILE_EPOCH) {
+            std::string warning = "struct " + s.type + " \"" + s.name + "\": " + s.src_filepath +
+                                  " last modified " +
+                                  DateTime::date_str(struct_stat.st_mtim.tv_sec) + " " +
+                                  DateTime::time_str(struct_stat.st_mtim.tv_sec);
+
+            mod_time_warnings.push_back(warning);
         }
+    }
+
+    if (mod_time_warnings.size()) {
+        std::cout << "Source files of structs have been modified since this program was compiled\n"
+                  << js::join(mod_time_warnings, "\n", " -> ") << "\n";
     }
 }
 
