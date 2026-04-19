@@ -1,17 +1,19 @@
-#include "jstrings.hpp"
 #include <iostream>
+#include "jstrings.hpp"
 
 namespace js = JStrings;
 
 #define TEST(a, b)                                                                                 \
     do {                                                                                           \
         if (a != b) {                                                                              \
-            std::cout << "Failed " #a " got: " << a << "\n";                                       \
+            std::cout << "Failed " #a " got: '" << a << "'\n";                                     \
         }                                                                                          \
     } while (0);
 
 int main() {
     std::string ex = "Example Text";
+
+    TEST(js::count(ex, "x"), 2);
 
     TEST(js::lower(ex), "example text");
     TEST(js::upper(ex), "EXAMPLE TEXT");
@@ -48,9 +50,8 @@ int main() {
 
     std::string split_test = "ex ex  ex ";
     auto split_ret = js::split(split_test, "x", JStrings::TrimAll, 0);
-     // split_ret = js::split(split_test, "", JStrings::TrimAll, 3);
+    // split_ret = js::split(split_test, "", JStrings::TrimAll, 3);
     std::cout << js::join(split_ret, "\n", "\"", "\"") << "\n";
-    
 
     std::string err;
     // short x = js::from_bin<short>("0b000000000000000011", &err);
@@ -60,5 +61,4 @@ int main() {
     if (err.length() > 0) {
         std::cout << err << "\n";
     }
-
 }

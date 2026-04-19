@@ -3,7 +3,7 @@
 
 #include <algorithm> // transform, find_if, remove_if
 #include <cassert>
-#include <cstdarg>   // fmt
+#include <cstdarg> // fmt
 #include <cstdint>
 #include <deque>     // jstringlist
 #include <stdexcept> // invlaid_argument, out_of_range
@@ -34,58 +34,40 @@ inline bool contains(const std::string &str, const std::string &key) {
 }
 
 inline bool contains(const JStringList &strs, const std::string &key) {
-    return std::find(strs.begin(), strs.end(), key) != strs.end();
+    return std::find(strs.cbegin(), strs.end(), key) != strs.cend();
 }
 
 /*===========================================================================*/
 
 inline bool contains_any(const std::string &str, const std::string &chars) {
-    for (char c : chars) {
-        if (str.find(c) != std::string::npos) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(chars.cbegin(), chars.cend(),
+                       [str](char c) { return str.find(c) != std::string::npos; });
 }
 
 inline bool contains_any(const JStringList &strs, const JStringList &keys) {
-    for (const std::string &key : keys) {
-        if (std::find(strs.begin(), strs.end(), key) != strs.end()) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(keys.cbegin(), keys.cend(), [strs](const std::string &key) {
+        return std::find(strs.cbegin(), strs.cend(), key) != strs.cend();
+    });
 }
 
 /*===========================================================================*/
 
 inline bool contains_all(const std::string &str, const std::string &chars) {
-    for (char c : chars) {
-        if (str.find(c) == std::string::npos) {
-            return false;
-        }
-    }
-    return true;
+    return std::all_of(chars.cbegin(), chars.cend(),
+                       [str](char c) { return str.find(c) != std::string::npos; });
 }
 
 inline bool contains_all(const JStringList &strs, const JStringList &keys) {
-    for (const std::string &key : keys) {
-        if (std::find(strs.begin(), strs.end(), key) == strs.end()) {
-            return false;
-        }
-    }
-    return true;
+    return std::all_of(keys.cbegin(), keys.cend(), [strs](const std::string &key) {
+        return std::find(strs.begin(), strs.end(), key) == strs.end();
+    });
 }
 
 /*===========================================================================*/
 
 inline bool contains_only(const std::string &str, const std::string &chars) {
-    for (char c : str) {
-        if (chars.find(c) == std::string::npos) {
-            return false;
-        }
-    }
-    return true;
+    return std::all_of(str.cbegin(), str.cend(),
+                       [chars](char c) { return chars.find(c) != std::string::npos; });
 }
 
 /*===========================================================================*/
@@ -120,13 +102,8 @@ inline size_t count(const std::string &str, std::string key) {
 }
 
 inline size_t count(const JStringList &strs, std::string key) {
-    size_t count = 0;
-    for (const std::string &str : strs) {
-        if (str == key) {
-            count++;
-        }
-    }
-    return count;
+    return std::count_if(strs.cbegin(), strs.cend(),
+                         [key](const std::string &str) { return str == key; });
 }
 
 /*===========================================================================*/
@@ -188,7 +165,7 @@ inline void right_pad(std::string *str, size_t new_size, char pad_char = ' ') {
 
     *str += std::string(new_size - str->length(), pad_char);
 }
-inline std::string right_pad(std::string str, int new_size, char pad_char = ' ') {
+inline std::string right_pad(std::string str, size_t new_size, char pad_char = ' ') {
     JStrings::right_pad(&str, new_size, pad_char);
     return str;
 }
@@ -211,7 +188,7 @@ inline void center_pad(std::string *str, size_t new_size, char pad_char = ' ') {
     const size_t left_length = pad_length / 2 + pad_length % 2;
     *str = std::string(left_length, pad_char) + *str + std::string(right_length, pad_char);
 }
-inline std::string center_pad(std::string str, int new_size, char pad_char = ' ') {
+inline std::string center_pad(std::string str, size_t new_size, char pad_char = ' ') {
     JStrings::center_pad(&str, new_size, pad_char);
     return str;
 }
@@ -228,16 +205,12 @@ enum StripBehavior : int { Left = 1, Right = 2, Both = Left | Right };
 inline void strip(std::string *str, const std::string &char_set, StripBehavior sb = Both) {
     assert(str != nullptr);
 
-    auto not_in_chars = [char_set](char c) -> bool {
-        return char_set.find(c) == std::string::npos;
-    };
-
     if (sb & Left) {
-        str->erase(str->begin(), std::find_if(str->begin(), str->end(), not_in_chars));
+        str->erase(0, str->find_first_not_of(char_set));
     }
 
     if (sb & Right) {
-        str->erase(std::find_if(str->rbegin(), str->rend(), not_in_chars).base(), str->end());
+        str->erase(str->find_last_not_of(char_set), std::string::npos);
     }
 }
 inline std::string strip(std::string str, std::string char_set, StripBehavior sb = Both) {
@@ -247,11 +220,11 @@ inline std::string strip(std::string str, std::string char_set, StripBehavior sb
 
 inline void strip(std::string *str, StripBehavior sb = Both) {
     if (sb & Left) {
-        str->erase(str->begin(), std::find_if(str->begin(), str->end(), ::isspace));
+        str->erase(str->begin(), std::find_if_not(str->begin(), str->end(), ::isspace));
     }
 
     if (sb & Right) {
-        str->erase(std::find_if(str->rbegin(), str->rend(), ::isspace).base(), str->end());
+        str->erase(std::find_if_not(str->rbegin(), str->rend(), ::isspace).base(), str->end());
     }
 }
 inline std::string strip(std::string str, StripBehavior sb = Both) {
@@ -297,7 +270,7 @@ inline void slice(std::string *str, int32_t start, int32_t stop) {
     }
 }
 
-inline std::string slice(std::string str, int start, int stop) {
+inline std::string slice(std::string str, int32_t start, int32_t stop) {
     JStrings::slice(&str, start, stop);
     return str;
 }
@@ -306,63 +279,32 @@ inline std::string slice(std::string str, int start, int stop) {
 
 enum ReplaceBehavior : int { First = 1, Last = 2, All = First | Last };
 
-inline void replace(std::string *str, std::string key, std::string sub, int rb = All) {
+inline void replace(std::string *str, const std::string &key, const std::string &sub,
+                    int rb = All) {
     assert(str != nullptr);
 
     if (str->find(key) == std::string::npos || key.length() == 0) {
         return;
     }
 
-    const bool no_copy = (key.length() == sub.length());
-
     if (rb == All) {
         size_t start = 0;
         size_t stop = 0;
 
-        std::string rebuilt;
         while ((start = str->find(key, stop)) != std::string::npos) {
-
-            if (no_copy) {
-                for (size_t i = 0; i < key.length(); i++) {
-                    str->at(start + i) = sub[i];
-                }
-            } else {
-                rebuilt += str->substr(stop, start - stop) + sub;
-            }
-
+            str->replace(start, key.length(), sub);
             stop = start + key.length();
-        }
-
-        if (!no_copy) {
-            rebuilt += str->substr(stop, std::string::npos);
-            *str = rebuilt;
         }
 
         return;
     }
 
     if (rb & First) {
-        size_t ifirst = str->find(key);
-        if (no_copy) {
-            for (size_t i = 0; i < key.length(); i++) {
-                str->at(ifirst + i) = sub[i];
-            }
-        } else {
-            *str = str->substr(0, ifirst) + sub +
-                   str->substr(ifirst + key.length(), std::string::npos);
-        }
+        str->replace(str->find(key), key.length(), sub);
     }
 
     if (rb & Last) {
-        size_t ilast = str->rfind(key);
-        if (no_copy) {
-            for (size_t i = 0; i < key.length(); i++) {
-                str->at(ilast + i) = sub[i];
-            }
-        } else {
-            *str =
-                str->substr(0, ilast) + sub + str->substr(ilast + key.length(), std::string::npos);
-        }
+        str->replace(str->rfind(key), key.length(), sub);
     }
 }
 inline std::string replace(std::string str, std::string key, std::string sub, int rb = All) {
@@ -372,11 +314,11 @@ inline std::string replace(std::string str, std::string key, std::string sub, in
 
 /*===========================================================================*/
 
-inline void remove(std::string *str, std::string key, int rb = All) {
+inline void remove(std::string *str, const std::string &key, int rb = All) {
     assert(str != nullptr);
     JStrings::replace(str, key, "", rb);
 }
-inline std::string remove(std::string str, std::string key, int rb = All) {
+inline std::string remove(std::string str, const std::string &key, int rb = All) {
     JStrings::remove(&str, key, rb);
     return str;
 }
@@ -385,7 +327,8 @@ inline std::string remove(std::string str, std::string key, int rb = All) {
 
 enum SplitBehavior : int { None = 0, SkipEmpty = 1, TrimAll = 2, SkipWhiteSpace = 4 };
 
-inline JStringList split(std::string str, std::string key, int sb = None, int maxsplit = -1) {
+inline JStringList split(std::string str, const std::string &key, int sb = None,
+                         int maxsplit = -1) {
     if (str.find(key) == std::string::npos || maxsplit == 0) {
         if (sb & TrimAll) {
             JStrings::strip(&str);
@@ -452,10 +395,11 @@ inline JStringList split(std::string str, std::string key, int sb = None, int ma
 
 /*===========================================================================*/
 
-inline std::string repeat(std::string str, size_t count) {
+inline std::string repeat(const std::string &str, size_t count) {
     std::string ret;
+    ret.reserve(count * str.length());
     for (size_t i = 0; i < count; i++) {
-        ret += str;
+        ret.append(str);
     }
     return ret;
 }
@@ -489,11 +433,7 @@ inline std::string join(const JStringList &strs, const std::string &sep = "\n",
 /*===========================================================================*/
 
 inline JStringList combine_lists(const JStringList &list1, const JStringList &list2) {
-    JStringList ret;
-
-    for (const std::string &str : list1) {
-        ret.push_back(str);
-    }
+    JStringList ret{list1};
 
     for (const std::string &str : list2) {
         ret.push_back(str);
@@ -521,10 +461,10 @@ inline unsigned long stoul_0x(std::string str, std::string *err = nullptr) {
     JStrings::remove(&str, "_");
     try {
         val = std::stoul(str, &idx, 16);
-    } catch (const std::invalid_argument &) {
+    } catch (const std::invalid_argument & /* e */) {
         set_err("invalid_argument");
         return 0;
-    } catch (const std::out_of_range &) {
+    } catch (const std::out_of_range & /* e */) {
         set_err("out_of_range");
         return 0;
     }
@@ -558,10 +498,10 @@ inline long stol(std::string str, std::string *err = nullptr) {
 
     try {
         val = std::stol(str, &idx);
-    } catch (const std::invalid_argument &) {
+    } catch (const std::invalid_argument & /* e */) {
         set_err("invalid_argument");
         return 0;
-    } catch (const std::out_of_range &) {
+    } catch (const std::out_of_range & /* e */) {
         set_err("out_of_range");
         return 0;
     }
@@ -616,12 +556,14 @@ inline double stod(std::string str, std::string *err = nullptr) {
                 set_err("invalid_argument");
                 return 0;
             }
+
             double e = exponent > 0 ? 10 : .1;
             exponent = abs(exponent);
 
             while (exponent-- > 0) {
                 val *= e;
             }
+
         } else {
             val = std::stod(str, &idx);
             if (idx != str.length()) {
@@ -629,10 +571,10 @@ inline double stod(std::string str, std::string *err = nullptr) {
                 return 0;
             }
         }
-    } catch (const std::invalid_argument &) {
+    } catch (const std::invalid_argument & /* e */) {
         set_err("invalid_argument");
         return 0;
-    } catch (const std::out_of_range &) {
+    } catch (const std::out_of_range & /* e */) {
         set_err("out_of_range");
         return 0;
     }
