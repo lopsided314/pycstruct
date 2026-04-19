@@ -274,7 +274,6 @@ class ObjectFrame:
         self.raw_full: str = body_def.strip()
         self.parents: list[ObjectFrame] = parents
         self.src_file: str = ""
-        self.src_file_mtime: int = 0
 
         self.instance_name: str = self.raw_full[
             self.raw_full.rfind("}") + 1 : self.raw_full.rfind(";")
@@ -492,7 +491,6 @@ def find_top_struct_defs(text: str, filename: str) -> dict[str, ObjectFrame]:
 
         obj = ObjectFrame(frame, [])
         obj.src_file = filename
-        obj.src_file_mtime = int(os.path.getmtime(filename))
         frames.append(obj)
 
     return {s.typename: s for s in frames if s.frame_type == "struct"}
@@ -587,7 +585,7 @@ def main(make_includes: list[str]) -> None:
             instances.append(f"#pragma pack(pop)")
 
         macros.append(
-            f'REGISTER_INTERNAL_STRUCT({request.typename}, {request.instance_name}, "{requested_struct.src_file}", "{reformat_struct(requested_struct.raw_full)}", {requested_struct.src_file_mtime});'
+            f'REGISTER_INTERNAL_STRUCT({request.typename}, {request.instance_name}, "{requested_struct.src_file}", "{reformat_struct(requested_struct.raw_full)}");'
         )
         macros += defined_structs[request.typename].reg_macros(request.instance_name)
         macros.append("")
