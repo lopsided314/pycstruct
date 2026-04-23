@@ -58,15 +58,15 @@ int main() {
         // {"co", "name->b", "123445678"},
         // {"co", "name->c", "deadbeef"},
         {"co", "name->u1.f", "-3.1415"},
-        {"ci", "name->"},
-        {"ci", "name->plpl*"},
+        // {"ci", "name->"},
+        // {"ci", "name->plpl*"},
         // {"mv", "name->", "100"},
         // {"ci", "name->"},
         // {"mv", "name->", "00"},
         // {"co", "name->d[1]", "-3.1415"},
         // {"co", "name->str", "some",  "text"},
         // {"ci", "name->"},
-        {"struct_src", "name->"},
+        // {"struct_src", "name->"},
     };
 
     for (const JStringList &args : arg_sets) {
