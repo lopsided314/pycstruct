@@ -214,28 +214,12 @@ static double cout_stod(const std::string &str) {
 // - [2]
 // - [2,3,6]
 // - [2:6] --> [2,3,4,5]
+// - [:] --> [0,1,...]
 //
 static std::vector<int> get_array_slice_indices(const std::string &arg, int index_limit) {
 
     const std::string brace_contents =
         js::contains_all(arg, "[]") ? js::slice(arg, arg.find('[') + 1, arg.find(']')) : ":";
-
-    auto index_stol = [index_limit](const std::string &s) -> int {
-        if (s.length() == 0) {
-            return 0;
-        }
-
-        int i = std::stol(s);
-        if (i < 0) {
-            i = index_limit + i;
-        }
-
-        if (i < 0 || i >= index_limit) {
-            throw std::runtime_error{nullptr};
-        }
-
-        return i;
-    };
 
     std::vector<int> indices;
 
@@ -246,11 +230,26 @@ static std::vector<int> get_array_slice_indices(const std::string &arg, int inde
 
             const auto brace_split = js::split(brace_contents, ":", js::TrimAll);
 
-            int start = index_stol(brace_split.at(0));
-            int stop = index_stol(brace_split.at(1));
+            int start = 0;
+            if (brace_split.at(0).length() > 0) {
+                start = std::stol(brace_split.at(0));
 
-            if (stop == 0) {
-                stop = index_limit;
+                if (start < 0) {
+                    start = index_limit - start;
+                } else if (start >= index_limit) {
+                    throw std::runtime_error{nullptr};
+                }
+            }
+
+            int stop = index_limit;
+            if (brace_split.at(1).length() > 0) {
+                stop = std::stol(brace_split.at(1));
+
+                if (stop < 0) {
+                    stop = index_limit - stop;
+                } else if (stop >= index_limit) {
+                    throw std::runtime_error{nullptr};
+                }
             }
 
             for (int i = start; i < stop; i++) {
@@ -261,8 +260,15 @@ static std::vector<int> get_array_slice_indices(const std::string &arg, int inde
             // csv
             const auto brace_split = js::split(brace_contents, ",", js::TrimAll | js::SkipEmpty);
             for (const std::string &s : brace_split) {
+                int i = std::stol(s);
 
-                indices.push_back(index_stol(s));
+                if (i < 0) {
+                    i = index_limit - i;
+                } else if (i >= index_limit) {
+                    throw std::runtime_error{nullptr};
+                }
+
+                indices.push_back(i);
             }
         }
 
@@ -355,20 +361,24 @@ std::pair<Struct *, Var *> get_struct(const std::string &svname) {
 // Based on the provided inputs from user, decide what to do with any of
 // the structs/struct members we have registered.
 //
-StructCmdFeedback parse_struct_cmd(const JStringList &args) {
+static OpReq op_req{};
+const OpReq &parse_struct_cmd(const JStringList &args) {
+    op_req = {};
 
     if (args.size() < 2) {
         std::cout << "Invalid args for struct operation\n";
-        return {};
+        return op_req;
     }
 
     const auto sv = get_struct(args[1]);
     const auto s = sv.first;
     const auto v = sv.second;
 
+    // If the base struct name doesn't exist, none of the functionality is
+    // available.
     if (!s) {
         std::cout << "Coulnd't find struct \"" << args[1] << "\"\n";
-        return {};
+        return op_req;
     }
 
     const bool addr_cmd = (args[0] == "com" || args[0] == "mv");
@@ -376,76 +386,70 @@ StructCmdFeedback parse_struct_cmd(const JStringList &args) {
     const bool write_cmd = (args[0] == "co" && args.size() >= 3);
     const bool src_def_cmd = (args[0] == "struct_src");
 
-    StructCmdFeedback ret{};
-
     if (addr_cmd && !v && args.size() == 3) {
         size_t new_addr = js::stoul_0x(args[2], &g_err);
         if (g_err.length() > 0) {
             std::cout << "set struct addr: " << g_err << "\n";
         } else {
             s->working_addr = new_addr;
-            ret.op = PASS;
+            op_req.op = OpReq::Op::PASS;
         }
-    }
+    } else if (read_cmd) {
 
-    if (read_cmd) {
-
-        ret.op = PRINT;
+        op_req.op = OpReq::Op::PRINT;
         if (v) {
-            ret.data = v->data;
-            ret.size = v->size;
-            ret.offset = v->offset + s->working_addr;
-            ret.print = v->print;
+            op_req.data = v->data;
+            op_req.size = v->size;
+            op_req.offset = v->offset + s->working_addr;
+            op_req.print = v->print;
         } else {
-            ret.data = s->data;
-            ret.size = s->size;
-            ret.offset = s->working_addr;
-            ret.print = s->print;
+            op_req.data = s->data;
+            op_req.size = s->size;
+            op_req.offset = s->working_addr;
+            op_req.print = s->print;
         }
-    }
-
-    if (v && write_cmd) {
-        ret.data = v->data;
-        ret.size = v->size;
-        ret.offset = v->offset + s->working_addr;
-        ret.set_val = v->set;
+    } else if (v && write_cmd) {
+        op_req.data = v->data;
+        op_req.size = v->size;
+        op_req.offset = v->offset + s->working_addr;
+        op_req.set_val = v->set;
 
         switch (v->type) {
         case Var::VarType::Std:
-            ret.op = WRITE;
+            op_req.op = OpReq::Op::WRITE;
             break;
         case Var::VarType::Array:
         case Var::VarType::BField:
-            ret.op = READ_WRITE;
+            op_req.op = OpReq::Op::READ_WRITE;
             break;
         }
-    }
-
-    if (src_def_cmd) {
+    } else if (src_def_cmd) {
         std::cout << " -> struct " << s->type << " \"" << s->name << "\" definition from "
                   << s->src_filepath << ":\n\n"
                   << s->src_definition << "\n\n";
 
-        ret.op = PASS;
+        op_req.op = OpReq::Op::PASS;
     }
 
-    if (ret.op == ERROR) {
+    if (op_req.op == OpReq::Op::ERROR) {
         std::cout << "Invalid args for struct operation\n";
     }
 
-    return ret;
+    return op_req;
 }
 
 /*================================================================================*/
+
+// include the static struct instances generated by the python
+#include "pycstruct_instances.txt"
 
 #ifndef COMPILE_EPOCH
 #define COMPILE_EPOCH LONG_MAX
 #endif
 
-#include "pycstruct_instances.txt"
-
 void init_structs() {
 
+// include the macro calls generated by the python
 #include "pycstruct_macros.txt"
 
     JStringList mod_time_warnings;
@@ -457,7 +461,7 @@ void init_structs() {
     for (const auto &_s : g_structs) {
         const auto &s = _s.second;
 
-        if (stat(s.src_filepath.c_str(), &struct_stat) < 0) {
+        if (::stat(s.src_filepath.c_str(), &struct_stat) < 0) {
             std::cout << "Cannot stat source for " << s.type << " \"" << s.name << "\" ("
                       << s.src_filepath << "): " << strerror(errno) << "\n";
             continue;
@@ -477,6 +481,31 @@ void init_structs() {
             << DateTime::date_str(COMPILE_EPOCH) + " " + DateTime::time_str(COMPILE_EPOCH) << "\n"
             << js::join(mod_time_warnings, "\n", " -> ") << "\n";
     }
+}
+
+JStringList struct_names() {
+    JStringList ret;
+    for (const auto &s : g_structs) {
+        ret.push_back(s.first);
+    }
+
+    return ret;
+}
+
+JStringList member_names(const std::string &arg) {
+    JStringList ret;
+    const auto sv = get_struct(arg);
+
+    if (!sv.first) {
+        std::cout << "Coulnd't find struct \"" << arg << "\"\n";
+        return {};
+    }
+
+    for (const auto &v : sv.first->vars) {
+        ret.push_back(v.first);
+    }
+
+    return ret;
 }
 
 } // namespace Structs

@@ -11,15 +11,18 @@ void init_structs();
 
 enum StructOperation { ERROR, PRINT, WRITE, READ_WRITE, PASS };
 
-struct StructCmdFeedback {
-    enum StructOperation op = ERROR;
+struct OpReq {
     uint8_t *data = nullptr;
     size_t size = 0;
     size_t offset = 0;
-    void (*set_val)(const JStringList &);
-    void (*print)(const JStringList &);
+    void (*set_val)(const JStringList &) = nullptr;
+    void (*print)(const JStringList &) = nullptr;
+    enum class Op { ERROR, PRINT, WRITE, READ_WRITE, PASS } op = Op::ERROR;
 };
 
-StructCmdFeedback parse_struct_cmd(const JStringList &args);
+const OpReq &parse_struct_cmd(const JStringList &args);
+
+JStringList struct_names();
+JStringList member_names(const std::string &arg);
 
 } // namespace Structs

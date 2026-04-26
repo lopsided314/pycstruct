@@ -71,32 +71,28 @@ int main() {
 
     for (const JStringList &args : arg_sets) {
 
-        StructCmdFeedback cmd = parse_struct_cmd(args);
+        const auto &cmd = parse_struct_cmd(args);
 
         switch (cmd.op) {
-        case PRINT:
+        case Structs::OpReq::Op::PRINT:
             read(cmd.data, cmd.size, cmd.offset);
             cmd.print(args);
             break;
 
-        case READ_WRITE:
+        case Structs::OpReq::Op::READ_WRITE:
             read(cmd.data, cmd.size, cmd.offset);
             // fall through
-        case WRITE:
+        case Structs::OpReq::Op::WRITE:
             cmd.set_val(args);
             write(cmd.data, cmd.size, cmd.offset);
             break;
 
-        case ERROR:
+        case Structs::OpReq::Op::ERROR:
             std::cout << "error\n";
             return 0;
 
-        case PASS:
+        case Structs::OpReq::Op::PASS:
             std::cout << "pass: " << js::join(args, " ") << "\n";
-            break;
-
-        default:
-            std::cout << "default???\n";
             break;
         }
         std::cout << "\n";
