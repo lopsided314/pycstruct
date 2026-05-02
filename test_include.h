@@ -12,7 +12,7 @@ struct Name2
     /* this scomment
     alskdfj
     */
-    struct PLPL {
+    struct /*PLPL*/ {
         uint32_t att:9, :7, phase:9, :7;
         uint32_t val;
     } plpl;

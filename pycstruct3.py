@@ -277,9 +277,15 @@ class ObjectFrame:
         self.parents: list[ObjectFrame] = parents
         self.src_file: str = ""
 
-        self.instance_name: str = self.raw_full[
-            self.raw_full.rfind("}") + 1 : self.raw_full.rfind(";")
-        ].strip()  # struct S {...} _name_;
+
+        # If this is a top level struct we don't want to keep any variable
+        # name since we will use the name provided in the register macro.
+        if self.parents:
+            self.instance_name: str = self.raw_full[
+                self.raw_full.rfind("}") + 1 : self.raw_full.rfind(";")
+            ].strip()  # struct S {...} _name_;
+        else:
+            self.instance_name: str = ""
 
         # For a nameless struct, default to _Struct for typename
         self.frame_type, self.typename = body_def.split(" ")[:2]
@@ -296,14 +302,19 @@ class ObjectFrame:
         self.vars: list[CStdVar] = []
 
         parent_types: list[str] = [p.typename for p in self.parents]
+
         parent_names: list[str] = [
             p.instance_name for p in self.parents if p.instance_name
         ]
 
         self.combo_type: str = "::".join(parent_types + [self.typename])
-        self.combo_name: str = ".".join(parent_names + [self.instance_name])
-        if self.combo_name:
-            self.combo_name += "."
+        self.combo_name: str = ""
+
+        if self.parents:
+            self.combo_name = ".".join(parent_names + [self.instance_name])
+
+            if self.combo_name:
+                self.combo_name += "."
 
         self._get_members()
 
