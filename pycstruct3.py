@@ -10,14 +10,15 @@ INSTANCE_FILE = DIR + "/pycstruct_instances.txt"
 MACRO_FILE = DIR + "/pycstruct_macros.txt"
 
 OVERWRITE_WARNING = """
-/*******************************************************************************\n
-*\n
-*\n
-* EVERYTHING IN THIS FILE WILL BE OVERRITTEN\n
-*\n
-*\n
-*******************************************************************************/\n
-\n\n
+/*******************************************************************************
+*
+*
+* EVERYTHING IN THIS FILE WILL BE OVERRITTEN
+*
+*
+*******************************************************************************/
+
+
 """
 
 DEBUG_PRINT = False
@@ -188,7 +189,7 @@ class CStdVar:
     def macro(self, parent: str, name_base: str) -> str:
         """Generate the pycstruct macro call for this variable."""
 
-        if self.ctype not in ctype_fmts:
+        if self.ctype not in ctype_fmts or self.name[:2] == "__":
             return ""
 
         printf, stonum = ctype_fmts[self.ctype]
@@ -249,9 +250,10 @@ class CBitfield:
             printf = printf[1:]
 
         for field_name, _ in self.fields:
-            macros.append(
-                f'REGISTER_BITFIELD({parent}, {name_base}{field_name}, {self.ctype}, "{printf}", {stonum});'
-            )
+            if field_name[:2] != "__":
+                macros.append(
+                    f'REGISTER_BITFIELD({parent}, {name_base}{field_name}, {self.ctype}, "{printf}", {stonum});'
+                )
 
         return macros
 
@@ -375,7 +377,8 @@ class ObjectFrame:
 
 def pop_object_frame(text: str) -> tuple[str, str]:
     """Return the first full object frame definition and the remainder of the
-    text."""
+    text.
+    """
 
     END: int = 1 << 31
     pos_end = lambda i: i if i >= 0 else END
@@ -397,7 +400,7 @@ def pop_object_frame(text: str) -> tuple[str, str]:
     first_semi: int = pos_end(text.find(";"))
 
     # Characters that signify features that we cannot deal with.
-    # functions, templates, constructors, inheritiance, ...
+    # functions, templates, constructors, inheritance, ...
     #
     # std::unique_ptr<struct S>{new struct S}
     bad_chars: str = "()<>"
@@ -458,8 +461,8 @@ def find_requests(text: str, filename: str) -> set[StructRegisterRequest]:
     """
     registers: set[StructRegisterRequest] = set()
 
-    text = text.replace("#define REGISTER_STRUCT", "")  # ignore the macro definition
-    i: int = text.find("REGISTER_STRUCT")
+    text = text.replace("#define REGISTER_PYCSTRUCT", "")  # ignore the macro definition
+    i: int = text.find("REGISTER_PYCSTRUCT")
 
     bad_chars: str = "()<>{}-+|/;!@#$%^&*~`.?\\"
     while i != -1:
@@ -472,7 +475,7 @@ def find_requests(text: str, filename: str) -> set[StructRegisterRequest]:
         args = [s.strip() for s in macro_args.split(",") if s.strip()]
         registers.add(StructRegisterRequest(filename, *args))
 
-        i = text.find("REGISTER_STRUCT", i + 1)
+        i = text.find("REGISTER_PYCSTRUCT", i + 1)
 
     return registers
 

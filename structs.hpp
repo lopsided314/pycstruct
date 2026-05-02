@@ -2,8 +2,8 @@
 
 #include "utils/jstrings/jstrings.hpp"
 
-#define REGISTER_STRUCT(typename, instance_name)
-#define REGISTER_STRUCT_PACK(typename, instance_name, pragma_pack)
+#define REGISTER_PYCSTRUCT(typename, instance_name)
+#define REGISTER_PYCSTRUCT_PACK(typename, instance_name, pragma_pack)
 
 namespace Structs {
 

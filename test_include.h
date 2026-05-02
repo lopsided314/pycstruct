@@ -21,6 +21,6 @@ struct Name2
         float f;
         uint32_t u;
     } u1;
-    char str[100];
-};
+    char __str[100];
+} name2;
 

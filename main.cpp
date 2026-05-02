@@ -18,9 +18,9 @@ struct Test2 {
 };
 } // namespace Main
 
-REGISTER_STRUCT(Test, test);
-REGISTER_STRUCT(Test2, test2);
-REGISTER_STRUCT_PACK(Name2, name, 4);
+REGISTER_PYCSTRUCT(Test, test);
+REGISTER_PYCSTRUCT(Test2, test2);
+REGISTER_PYCSTRUCT_PACK(Name2, name, 4);
 
 namespace js = JStrings;
 
@@ -65,7 +65,7 @@ int main() {
         // {"mv", "name->", "00"},
         // {"co", "name->d[1]", "-3.1415"},
         // {"co", "name->str", "some",  "text"},
-        // {"ci", "name->"},
+        {"ci", "name->"},
         // {"struct_src", "name->"},
     };
 

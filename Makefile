@@ -1,7 +1,7 @@
 CXX:=g++
 STD:=-std=c++11
 FLAGS:=-Wpedantic -Wextra -Wall -ggdb -O1 
-INCLUDES:=
+INCLUDES:=-I.
 DEFINES:=-DCOMPILE_EPOCH=$(shell date +%s)
 EXE=test
 PYTHON=python3 
