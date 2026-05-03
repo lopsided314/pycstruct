@@ -277,7 +277,6 @@ class ObjectFrame:
         self.parents: list[ObjectFrame] = parents
         self.src_file: str = ""
 
-
         # If this is a top level struct we don't want to keep any variable
         # name since we will use the name provided in the register macro.
         if self.parents:

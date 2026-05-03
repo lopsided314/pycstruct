@@ -34,7 +34,7 @@ inline bool contains(const std::string &str, const std::string &key) {
 }
 
 inline bool contains(const JStringList &strs, const std::string &key) {
-    return std::find(strs.cbegin(), strs.end(), key) != strs.cend();
+    return std::find(strs.cbegin(), strs.cend(), key) != strs.cend();
 }
 
 /*===========================================================================*/

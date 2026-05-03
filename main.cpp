@@ -71,30 +71,34 @@ int main() {
 
     for (const JStringList &args : arg_sets) {
 
-        const auto &cmd = parse_struct_cmd(args);
+        if (is_struct_cmd(args)) {
 
-        switch (cmd.op) {
-        case Structs::OpReq::Op::PRINT:
-            read(cmd.data, cmd.size, cmd.offset);
-            cmd.print(args);
-            break;
+            const auto &cmd = parse_struct_cmd(args);
 
-        case Structs::OpReq::Op::READ_WRITE:
-            read(cmd.data, cmd.size, cmd.offset);
-            // fall through
-        case Structs::OpReq::Op::WRITE:
-            cmd.set_val(args);
-            write(cmd.data, cmd.size, cmd.offset);
-            break;
+            switch (cmd.op) {
+            case Structs::OpReq::PRINT:
+                read(cmd.data, cmd.size, cmd.offset);
+                cmd.print(args);
+                break;
 
-        case Structs::OpReq::Op::ERROR:
-            std::cout << "error\n";
-            return 0;
+            case Structs::OpReq::READ_WRITE:
+                read(cmd.data, cmd.size, cmd.offset);
+                // fall through
+            case Structs::OpReq::WRITE:
+                cmd.set_val(args);
+                write(cmd.data, cmd.size, cmd.offset);
+                break;
 
-        case Structs::OpReq::Op::PASS:
-            std::cout << "pass: " << js::join(args, " ") << "\n";
-            break;
+            case Structs::OpReq::PASS:
+                std::cout << "pass: " << js::join(args, " ") << "\n";
+                break;
+
+            case Structs::OpReq::ERROR:
+                std::cout << "error\n";
+                return 0;
+            }
+
+            std::cout << "\n";
         }
-        std::cout << "\n";
     }
 }
