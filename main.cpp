@@ -7,8 +7,11 @@ struct Test {
     int a;
     unsigned int b : 10, : 6, c : 12, : 4;
     float d[4];
+    struct TestTest {
+        int a;
+    } testtest;
     float f;
-};
+} testtesttest;
 
 namespace Main {
 

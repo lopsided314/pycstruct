@@ -210,7 +210,7 @@ inline void strip(std::string *str, const std::string &char_set, StripBehavior s
     }
 
     if (sb & Right) {
-        str->erase(str->find_last_not_of(char_set), std::string::npos);
+        str->erase(str->find_last_not_of(char_set) + 1, std::string::npos);
     }
 }
 inline std::string strip(std::string str, std::string char_set, StripBehavior sb = Both) {
